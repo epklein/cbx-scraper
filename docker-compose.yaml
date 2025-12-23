@@ -1,0 +1,27 @@
+services:
+  cbx-scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cbx-scraper
+    environment:
+      # Email Notification Settings (from .env or defaults)
+      ADMIN_CC_EMAIL: ${ADMIN_CC_EMAIL}
+      SMTP_SERVER: ${SMTP_SERVER}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      # External API Integration (optional)
+      CBX_IDS_API_ENDPOINT: ${CBX_IDS_API_ENDPOINT}
+      CBX_RATINGS_API_ENDPOINT: ${CBX_RATINGS_API_ENDPOINT}
+      API_TOKEN: ${API_TOKEN}
+    volumes:
+      # Mount data directory for players.csv input and cbx_ratings.csv output
+      - /data/cbx-scraper:/data
+    networks:
+      - cbx-network
+    restart: "no"  # Disabled - use cron for scheduling instead
+
+networks:
+  cbx-network:
+    driver: bridge

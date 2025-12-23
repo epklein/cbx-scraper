@@ -1,0 +1,28 @@
+    name: Deploy to Hostinger
+
+    on:
+      push:
+        branches: [ main ]
+
+    jobs:
+      deploy:
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v5
+        - name: Deploy to Hostinger
+          uses: hostinger/deploy-on-vps@v2
+          with:
+            api-key: ${{ secrets.HOSTINGER_API_KEY }}
+            virtual-machine: ${{ vars.HOSTINGER_VM_ID }}
+            docker-compose-path: docker-compose.yaml
+            environment-variables: |
+              CBX=/data/players.csv
+              CBX_OUTPUT_FILE=/data/cbx_ratings.csv
+              ADMIN_CC_EMAIL=${{ vars.ADMIN_CC_EMAIL }}
+              SMTP_SERVER=${{ vars.SMTP_SERVER }}
+              SMTP_PORT=${{ vars.SMTP_PORT }}
+              SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}
+              SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+              CBX_IDS_API_ENDPOINT=${{ vars.CBX_IDS_API_ENDPOINT }}
+              CBX_RATINGS_API_ENDPOINT=${{ vars.CBX_RATINGS_API_ENDPOINT }}
+              API_TOKEN=${{ secrets.API_TOKEN }}
