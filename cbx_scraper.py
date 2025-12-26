@@ -16,6 +16,7 @@ import argparse
 from dotenv import load_dotenv
 import logging
 from datetime import datetime
+import calendar
 from email_notifier import send_batch_notifications
 from ratings_api import send_batch_api_updates
 
@@ -85,6 +86,102 @@ def validate_email(email: str) -> bool:
     return bool(re.match(pattern, email))
 
 
+def _parse_portuguese_month(month_abbr: str) -> int:
+    """
+    Parse Portuguese month abbreviation to month number (1-12).
+
+    Args:
+        month_abbr: Portuguese month abbreviation (Jan, Fev, Mar, Abr, Mai, Jun, Jul, Ago, Set, Out, Nov, Dez)
+
+    Returns:
+        Month number (1-12)
+
+    Raises:
+        ValueError: If month abbreviation is invalid
+
+    Examples:
+        >>> _parse_portuguese_month("Nov")
+        11
+        >>> _parse_portuguese_month("Fev")
+        2
+        >>> _parse_portuguese_month("Out")
+        10
+    """
+    month_map = {
+        "Jan": 1, "Fev": 2, "Mar": 3, "Abr": 4, "Mai": 5, "Jun": 6,
+        "Jul": 7, "Ago": 8, "Set": 9, "Out": 10, "Nov": 11, "Dez": 12
+    }
+
+    if month_abbr not in month_map:
+        raise ValueError(f"Invalid Portuguese month abbreviation: {month_abbr}")
+
+    return month_map[month_abbr]
+
+
+def _calculate_month_end_date(year: int, month: int) -> date:
+    """
+    Calculate the last day of a given month/year.
+
+    Args:
+        year: Calendar year
+        month: Month number (1-12)
+
+    Returns:
+        date object for the last day of the month
+
+    Examples:
+        >>> _calculate_month_end_date(2025, 11)
+        datetime.date(2025, 11, 30)
+        >>> _calculate_month_end_date(2024, 2)  # Leap year
+        datetime.date(2024, 2, 29)
+    """
+    last_day = calendar.monthrange(year, month)[1]
+    return date(year, month, last_day)
+
+
+def _parse_month_year_string(month_year_str: str) -> Optional[date]:
+    """
+    Parse Portuguese month/year string to ISO 8601 date (last day of month).
+
+    Args:
+        month_year_str: Month/year string in format "Month/Year" (e.g., "Nov/2025", "Out/2025")
+
+    Returns:
+        date object for the last day of the month, or None if parsing fails
+
+    Examples:
+        >>> _parse_month_year_string("Nov/2025")
+        datetime.date(2025, 11, 30)
+        >>> _parse_month_year_string("Out/2025")
+        datetime.date(2025, 10, 31)
+        >>> _parse_month_year_string("Invalid/2025")
+        None
+    """
+    if not month_year_str or not isinstance(month_year_str, str):
+        return None
+
+    try:
+        # Split by '/'
+        parts = month_year_str.strip().split('/')
+        if len(parts) != 2:
+            return None
+
+        month_abbr = parts[0].strip()
+        year_str = parts[1].strip()
+
+        # Parse month abbreviation
+        month = _parse_portuguese_month(month_abbr)
+
+        # Parse year
+        year = int(year_str)
+
+        # Calculate and return last day of month
+        return _calculate_month_end_date(year, month)
+
+    except (ValueError, IndexError):
+        return None
+
+
 def construct_cbx_url(cbx_id: str) -> str:
     """
     Construct CBX profile URL from CBX ID.
@@ -130,22 +227,30 @@ def fetch_cbx_profile(cbx_id: str, timeout: int = 10) -> Optional[str]:
         raise requests.HTTPError(f"HTTP error {response.status_code}: {e}")
 
 
-def _extract_rating_from_cbx_table(html: str, column_index: int) -> Optional[int]:
+def _extract_all_history_rows(html: str) -> List[Dict]:
     """
-    Extract rating from CBX profile HTML by parsing the ratings table.
+    Extract all rating history rows from the CBX rating history table.
 
-    Extracts from the first data row (TR) of the ContentPlaceHolder1_gdvRating table,
-    at the specified column index.
+    Extracts all data rows from the ContentPlaceHolder1_gdvRating table,
+    returning one dict per row with month/year string and three ratings.
 
     Args:
         html: HTML content from CBX profile page
-        column_index: Column index (0=Month/Year, 1=Standard, 2=Rapid, 3=Blitz)
 
     Returns:
-        Rating as integer, or None if not found/unrated
+        List of dicts with keys: month_year_str, standard, rapid, blitz
+        Each rating value is an integer or None (for unrated)
+        Returns empty list if table not found or parsing fails
+
+    Examples:
+        >>> extract_all_history_rows(html)
+        [
+            {'month_year_str': 'Nov/2025', 'standard': 1800, 'rapid': 1884, 'blitz': 1800},
+            {'month_year_str': 'Out/2025', 'standard': 1800, 'rapid': 1914, 'blitz': 1800},
+        ]
     """
     if not html:
-        return None
+        return []
 
     try:
         soup = BeautifulSoup(html, 'html.parser')
@@ -154,93 +259,192 @@ def _extract_rating_from_cbx_table(html: str, column_index: int) -> Optional[int
         table = soup.find('table', {'id': 'ContentPlaceHolder1_gdvRating'})
 
         if not table:
-            return None
+            return []
 
         # Find all rows (TR elements)
         rows = table.find_all('tr')
 
         # We need at least 2 rows (header + at least one data row)
         if len(rows) < 2:
-            return None
+            return []
 
-        # Get the first data row (index 1, after header at index 0)
-        data_row = rows[1]
+        history_records = []
 
-        # Get all cells (TD elements) in the data row
-        cells = data_row.find_all('td')
+        # Process all data rows (skip header at index 0)
+        for data_row in rows[1:]:
+            # Get all cells (TD elements) in the data row
+            cells = data_row.find_all('td')
 
-        # Check if the requested column exists
-        if len(cells) <= column_index:
-            return None
+            # We need at least 4 cells (month/year + 3 ratings)
+            if len(cells) < 4:
+                continue
 
-        # Get the cell at the specified column
-        cell = cells[column_index]
-        rating_text = cell.get_text(strip=True)
+            try:
+                # Extract month/year string (column 0)
+                month_year_str = cells[0].get_text(strip=True)
+                if not month_year_str:
+                    continue
 
-        # Check if it's empty or says "unrated"
-        if not rating_text or rating_text.lower() in ['not rated', 'unrated', '']:
-            return None
+                # Extract ratings (columns 1, 2, 3)
+                def extract_rating(cell) -> Optional[int]:
+                    text = cell.get_text(strip=True)
+                    if not text or text.lower() in ['not rated', 'unrated', '']:
+                        return None
+                    try:
+                        rating = int(text)
+                        # Validate rating is in reasonable range
+                        if 0 <= rating <= 3000:
+                            return rating
+                    except ValueError:
+                        pass
+                    return None
 
-        # Extract numeric rating
-        try:
-            rating = int(rating_text)
-            # Validate rating is in reasonable range
-            if 0 <= rating <= 3000:
-                return rating
-        except ValueError:
-            return None
+                standard = extract_rating(cells[1])
+                rapid = extract_rating(cells[2])
+                blitz = extract_rating(cells[3])
 
-        return None
+                # Add record even if all ratings are None (month might be unrated)
+                history_records.append({
+                    'month_year_str': month_year_str,
+                    'standard': standard,
+                    'rapid': rapid,
+                    'blitz': blitz
+                })
+
+            except (IndexError, ValueError):
+                # Skip this row if extraction fails
+                continue
+
+        return history_records
+
     except Exception:
-        return None
+        return []
 
 
-def extract_standard_rating(html: str) -> Optional[int]:
+def _deduplicate_history_by_month(history_rows: List[Dict]) -> List[Dict]:
     """
-    Extract standard rating from CBX profile HTML.
+    Deduplicate history rows by month, keeping the topmost (most recent) entry.
 
-    Extracts from column 1 (Clássico) of the first data row in the
-    ContentPlaceHolder1_gdvRating table.
+    When the same month appears multiple times, keeps the first occurrence
+    (which appears at the top of the table and is most recent) and discards
+    later occurrences.
+
+    Args:
+        history_rows: List of history row dicts from _extract_all_history_rows
+
+    Returns:
+        List of deduplicated history rows in original order
+
+    Examples:
+        >>> rows = [
+        ...     {'month_year_str': 'Jun/2025', 'standard': 1800, 'rapid': 1849, 'blitz': 1800},
+        ...     {'month_year_str': 'May/2025', 'standard': 1800, 'rapid': 1885, 'blitz': 1800},
+        ...     {'month_year_str': 'Jun/2025', 'standard': 1800, 'rapid': 1885, 'blitz': 1800},  # Duplicate
+        ... ]
+        >>> deduplicated = _deduplicate_history_by_month(rows)
+        >>> len(deduplicated)
+        2
+        >>> deduplicated[0]['rapid']
+        1849
+    """
+    seen_months = set()
+    deduplicated = []
+
+    for row in history_rows:
+        month_year_str = row.get('month_year_str')
+
+        if month_year_str not in seen_months:
+            seen_months.add(month_year_str)
+            deduplicated.append(row)
+
+    return deduplicated
+
+
+def _convert_raw_history_to_records(raw_history: List[Dict]) -> List[Dict]:
+    """
+    Convert raw history rows to final monthly records with parsed dates.
+
+    Takes raw history from _extract_all_history_rows, deduplicates by month,
+    and converts month/year strings to ISO 8601 dates (last day of month).
+
+    Args:
+        raw_history: List of raw history row dicts from _extract_all_history_rows
+
+    Returns:
+        List of final monthly record dicts with keys: date, standard, rapid, blitz
+        Only includes records where month parsing succeeds (invalid months are skipped)
+
+    Examples:
+        >>> raw = [
+        ...     {'month_year_str': 'Nov/2025', 'standard': 1800, 'rapid': 1884, 'blitz': 1800},
+        ...     {'month_year_str': 'Out/2025', 'standard': 1800, 'rapid': 1914, 'blitz': 1800},
+        ... ]
+        >>> records = _convert_raw_history_to_records(raw)
+        >>> records[0]['date']
+        datetime.date(2025, 11, 30)
+    """
+    # First deduplicate
+    deduplicated = _deduplicate_history_by_month(raw_history)
+
+    # Then convert each row
+    final_records = []
+
+    for row in deduplicated:
+        month_year_str = row.get('month_year_str')
+
+        # Parse month/year string to date
+        month_date = _parse_month_year_string(month_year_str)
+
+        # Skip if month parsing fails
+        if month_date is None:
+            continue
+
+        # Build final record
+        final_record = {
+            'date': month_date,
+            'standard': row.get('standard'),
+            'rapid': row.get('rapid'),
+            'blitz': row.get('blitz')
+        }
+
+        final_records.append(final_record)
+
+    return final_records
+
+
+def extract_rating_history(html: str) -> List[Dict]:
+    """
+    Extract complete rating history from CBX player profile.
+
+    Orchestrates the full history extraction pipeline:
+    1. Extract all rows from the rating table
+    2. Deduplicate by month (keeping topmost entry)
+    3. Parse month/year strings to ISO 8601 dates
+    4. Return final monthly records
 
     Args:
         html: HTML content from CBX profile page
 
     Returns:
-        Standard rating as integer, or None if not found/unrated
+        List of monthly rating records with keys: date, standard, rapid, blitz
+        Returns empty list if extraction fails or no data found
+
+    Examples:
+        >>> history = extract_rating_history(html)
+        >>> len(history)
+        7
+        >>> history[0]['date']
+        datetime.date(2025, 11, 30)
+        >>> history[0]['rapid']
+        1884
     """
-    return _extract_rating_from_cbx_table(html, 1)
+    # Step 1: Extract all raw rows
+    raw_history = _extract_all_history_rows(html)
 
+    # Step 2-4: Convert to final records (deduplicates and parses dates)
+    final_history = _convert_raw_history_to_records(raw_history)
 
-def extract_rapid_rating(html: str) -> Optional[int]:
-    """
-    Extract rapid rating from CBX profile HTML.
-
-    Extracts from column 2 (Rápido) of the first data row in the
-    ContentPlaceHolder1_gdvRating table.
-
-    Args:
-        html: HTML content from CBX profile page
-
-    Returns:
-        Rapid rating as integer, or None if not found/unrated
-    """
-    return _extract_rating_from_cbx_table(html, 2)
-
-
-def extract_blitz_rating(html: str) -> Optional[int]:
-    """
-    Extract blitz rating from CBX profile HTML.
-
-    Extracts from column 3 (Blitz) of the first data row in the
-    ContentPlaceHolder1_gdvRating table.
-
-    Args:
-        html: HTML content from CBX profile page
-
-    Returns:
-        Blitz rating as integer, or None if not found/unrated
-    """
-    return _extract_rating_from_cbx_table(html, 3)
+    return final_history
 
 
 def extract_player_name(html: str) -> Optional[str]:
@@ -574,20 +778,27 @@ def augment_players_file(csv_path: str, new_ids: List[str]) -> bool:
         return False
 
 
-def load_historical_ratings_by_player(filepath: str) -> Dict[str, Dict[str, any]]:
+def load_historical_ratings_by_player(filepath: str) -> Dict[str, List[Dict]]:
     """
-    Load historical ratings from CSV file and index by CBX ID.
+    Load historical ratings from CSV file with monthly granularity.
 
     Reads the output CSV file (typically 'cbx_ratings.csv') and creates a dictionary
-    indexed by CBX ID, with each entry containing the most recent rating record
-    for that player. This is used for change detection.
+    indexed by CBX ID, with each entry containing ALL monthly rating records for that
+    player. This is used for change detection to find new months.
 
     Args:
         filepath: Path to the historical ratings CSV file (typically 'cbx_ratings.csv')
 
     Returns:
-        Dictionary mapping CBX ID to latest player rating record:
-        {cbx_id: {"Date": "...", "Player Name": "...", "Standard": ..., ...}, ...}
+        Dictionary mapping CBX ID to list of monthly rating records:
+        {
+            cbx_id: [
+                {"Date": "2025-11-30", "Player Name": "...", "Standard": ..., ...},
+                {"Date": "2025-10-31", "Player Name": "...", "Standard": ..., ...},
+                ...
+            ],
+            ...
+        }
         Returns empty dict if file doesn't exist (first run)
 
     Side Effects:
@@ -612,7 +823,7 @@ def load_historical_ratings_by_player(filepath: str) -> Dict[str, Dict[str, any]
                 # File exists but has wrong format, return empty
                 return player_ratings
 
-            # Read all records, keeping only the latest for each CBX ID
+            # Read all records, grouping by CBX ID
             for row in reader:
                 cbx_id = row.get('CBX ID', '').strip()
 
@@ -620,14 +831,20 @@ def load_historical_ratings_by_player(filepath: str) -> Dict[str, Dict[str, any]
                 if not cbx_id:
                     continue
 
-                # Always keep the latest record (CSV is appended, so last one is latest)
-                player_ratings[cbx_id] = {
+                # Initialize list for this player if needed
+                if cbx_id not in player_ratings:
+                    player_ratings[cbx_id] = []
+
+                # Add this month's record to the player's history
+                month_record = {
                     "Date": row.get('Date', ''),
                     "Player Name": row.get('Player Name', ''),
                     "Standard": row.get('Standard', '') or None,
                     "Rapid": row.get('Rapid', '') or None,
                     "Blitz": row.get('Blitz', '') or None
                 }
+
+                player_ratings[cbx_id].append(month_record)
 
     except (PermissionError, UnicodeDecodeError):
         # On read errors, silently return empty dict (same as file not found)
@@ -636,126 +853,144 @@ def load_historical_ratings_by_player(filepath: str) -> Dict[str, Dict[str, any]
     return player_ratings
 
 
-def detect_rating_changes(
+def detect_new_months(
     cbx_id: str,
-    new_ratings: Dict[str, Optional[int]],
-    historical_data: Dict[str, Dict]
-) -> Dict[str, Tuple[Optional[int], Optional[int]]]:
+    scraped_history: List[Dict],
+    stored_history: Dict[str, List[Dict]]
+) -> List[Dict]:
     """
-    Detect which player ratings have changed between runs.
+    Detect new months in scraped history that don't exist in stored history.
 
-    Compares current ratings against the most recent historical record for a player.
-    Returns a dictionary of only the changed ratings. For new players (not in history),
-    all scraped ratings are notified as changes.
+    Compares complete scraped monthly history against stored monthly history to identify
+    months that are new (exist in scraped but not in stored history). This is used for
+    selective notifications - only notify when genuinely new months are found.
 
     Args:
         cbx_id: Player's CBX ID
-        new_ratings: Latest ratings fetched (e.g., {"Standard": 2450, "Rapid": 2300, "Blitz": 2100})
-        historical_data: Dictionary indexed by CBX ID with latest record per player
-                        (from load_historical_ratings_by_player)
+        scraped_history: List of monthly records from extract_rating_history
+                        Format: [{"date": date_obj, "standard": int, ...}, ...]
+        stored_history: Dictionary indexed by CBX ID with list of stored monthly records
+                       (from load_historical_ratings_by_player)
+                       Format: {cbx_id: [{"Date": "2025-11-30", "Standard": "1800", ...}, ...], ...}
 
     Returns:
-        Dictionary of changed ratings: {rating_type: (old_value, new_value), ...}
-        For new players, all ratings are returned as changes with None as old_value.
+        List of new monthly records (format same as scraped_history records)
+        Empty list if no new months detected
 
     Examples:
-        # Player with rating increase
-        changes = detect_rating_changes(
+        # New month detected
+        new_months = detect_new_months(
             "12345678",
-            {"Standard": 2450, "Rapid": 2300, "Blitz": 2100},
-            {"12345678": {"Standard": "2440", "Rapid": "2300", "Blitz": "2100"}}
+            [{"date": date(2025, 11, 30), "standard": 1800, "rapid": 1884, "blitz": 1800}],
+            {"12345678": [{"Date": "2025-10-31", "Standard": "1800", ...}]}
         )
-        # Returns: {"Standard": (2440, 2450)}
+        # Returns one new month record
 
-        # New player (not in history) - all ratings are changes
-        changes = detect_rating_changes(
-            "99999999",
-            {"Standard": 2450, "Rapid": 2300, "Blitz": 2100},
-            {}
+        # No new months
+        new_months = detect_new_months(
+            "12345678",
+            [{"date": date(2025, 11, 30), "standard": 1800, "rapid": 1884, "blitz": 1800}],
+            {"12345678": [{"Date": "2025-11-30", "Standard": "1800", ...}]}
         )
-        # Returns: {"Standard": (None, 2450), "Rapid": (None, 2300), "Blitz": (None, 2100)}
+        # Returns empty list
     """
-    changes = {}
+    # Get stored month dates for this player
+    stored_months = set()
 
-    # If player not in historical data, they're new - report all ratings as changes
-    if cbx_id not in historical_data:
-        for rating_type in ["Standard", "Rapid", "Blitz"]:
-            new_rating = new_ratings.get(rating_type)
-            if new_rating is not None:
-                changes[rating_type] = (None, new_rating)
-        return changes
+    if cbx_id in stored_history:
+        for stored_record in stored_history[cbx_id]:
+            stored_date_str = stored_record.get("Date", "")
+            if stored_date_str:
+                stored_months.add(stored_date_str)
 
-    historical_record = historical_data[cbx_id]
+    # Find new months in scraped history
+    new_months = []
 
-    # Check each rating type
-    for rating_type in ["Standard", "Rapid", "Blitz"]:
-        new_rating = new_ratings.get(rating_type)
+    for scraped_record in scraped_history:
+        scraped_date = scraped_record.get("date")
+        if scraped_date is None:
+            continue
 
-        # Get historical rating, converting empty string to None
-        historical_rating_str = historical_record.get(rating_type)
-        historical_rating = None
-        if historical_rating_str and isinstance(historical_rating_str, str) and historical_rating_str.strip():
-            try:
-                historical_rating = int(historical_rating_str)
-            except (ValueError, TypeError):
-                historical_rating = None
+        # Convert to ISO format for comparison
+        scraped_date_str = scraped_date.isoformat() if isinstance(scraped_date, date) else str(scraped_date)
 
-        # Compare ratings (considering None as unrated)
-        if new_rating != historical_rating:
-            changes[rating_type] = (historical_rating, new_rating)
+        # If this month is not in stored history, it's new
+        if scraped_date_str not in stored_months:
+            new_months.append(scraped_record)
 
-    return changes
+    return new_months
 
 
 def write_csv_output(filename: str, player_profiles: List[Dict]) -> None:
     """
-    Write player profiles to CSV file, replacing same-day entries and preserving older entries.
+    Write player profiles to CSV file with monthly granularity.
 
-    Creates file with headers if it doesn't exist. If file exists, removes any entries from today
-    and appends new entries. This ensures that running the script multiple times on the same day
-    replaces previous data while preserving history from previous dates.
+    Creates file with headers if it doesn't exist. For each player, writes one row per month
+    from their rating_history. If a month already exists for a player, the existing row is
+    replaced (UPDATE semantics).
 
-    Each entry includes the current date as the first column.
+    The Date column contains the last day of each month (e.g., 2025-11-30 for November 2025).
 
     Args:
         filename: Path to output CSV file
-        player_profiles: List of dictionaries with keys: CBX ID, Player Name, Standard, Rapid, Blitz
+        player_profiles: List of dictionaries with keys: CBX ID, Player Name, rating_history
+                        where rating_history is a list of dicts with: date, Standard, Rapid, Blitz
     """
     fieldnames = ['Date', 'CBX ID', 'Player Name', 'Standard', 'Rapid', 'Blitz']
-    today = date.today().isoformat()
     file_exists = os.path.exists(filename)
 
-    # If file exists, read it and filter out today's entries
-    existing_rows = []
+    # If file exists, read it and build a map of (CBX ID, Date) -> row
+    existing_rows_by_key = {}
     if file_exists:
         with open(filename, 'r', newline='', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                # Keep entries from previous dates, exclude today's entries
-                if row.get('Date') != today:
-                    existing_rows.append(row)
+                cbx_id = row.get('CBX ID', '')
+                date_str = row.get('Date', '')
+                key = (cbx_id, date_str)
+                existing_rows_by_key[key] = row
 
-    # Write the file with preserved older entries and new entries for today
+    # Build new rows from profiles
+    new_rows_by_key = {}
+
+    for profile in player_profiles:
+        cbx_id = profile.get('CBX ID', '')
+        player_name = profile.get('Player Name', '')
+        rating_history = profile.get('Rating History', [])
+
+        # Write one row per month in history
+        for month_record in rating_history:
+            month_date = month_record.get('date')
+            if month_date is None:
+                continue
+
+            date_str = month_date.isoformat() if isinstance(month_date, date) else str(month_date)
+
+            key = (cbx_id, date_str)
+
+            # Convert None values to empty strings for CSV
+            row = {
+                'Date': date_str,
+                'CBX ID': cbx_id,
+                'Player Name': player_name,
+                'Standard': month_record.get('standard', '') if month_record.get('standard') is not None else '',
+                'Rapid': month_record.get('rapid', '') if month_record.get('rapid') is not None else '',
+                'Blitz': month_record.get('blitz', '') if month_record.get('blitz') is not None else ''
+            }
+
+            new_rows_by_key[key] = row
+
+    # Merge existing and new rows: new rows override existing ones
+    merged_rows_by_key = {**existing_rows_by_key, **new_rows_by_key}
+
+    # Write the file
     with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
-        # Write preserved older entries
-        for row in existing_rows:
-            writer.writerow(row)
-
-        # Write new entries for today
-        for profile in player_profiles:
-            # Convert None values to empty strings for CSV
-            row = {
-                'Date': today,
-                'CBX ID': profile.get('CBX ID', ''),
-                'Player Name': profile.get('Player Name', ''),
-                'Standard': profile.get('Standard', '') if profile.get('Standard') is not None else '',
-                'Rapid': profile.get('Rapid', '') if profile.get('Rapid') is not None else '',
-                'Blitz': profile.get('Blitz', '') if profile.get('Blitz') is not None else ''
-            }
-            writer.writerow(row)
+        # Write all merged rows (sorted for consistency)
+        for key in sorted(merged_rows_by_key.keys()):
+            writer.writerow(merged_rows_by_key[key])
 
 
 def format_console_output(player_profiles: List[Dict]) -> str:
@@ -799,25 +1034,25 @@ def format_console_output(player_profiles: List[Dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def process_batch(cbx_ids: List[str], historical_data: Dict[str, Dict] = None) -> Tuple[List[Dict], List[str]]:
+def process_batch(cbx_ids: List[str], historical_data: Dict[str, List[Dict]] = None) -> Tuple[List[Dict], List[str]]:
     """
-    Process a batch of CBX IDs and extract player information with change detection.
+    Process a batch of CBX IDs and extract rating history with new month detection.
 
     Args:
         cbx_ids: List of CBX ID strings to process
         historical_data: Optional dictionary of historical ratings (for change detection).
                         If None, loaded from OUTPUT_FILENAME (cbx_ratings.csv).
-                        Format: {cbx_id: {Date, Player Name, Standard, Rapid, Blitz}, ...}
+                        Format: {cbx_id: [{"Date": "...", ...}, ...], ...}
 
     Returns:
         Tuple of (results, errors) where:
-        - results: List of dictionaries with player data and detected changes
+        - results: List of dictionaries with player data and rating history
         - errors: List of error messages
 
     Note:
-        Each result dict includes a 'changes' key with detected rating changes:
-        {'changes': {'Standard': (old, new), ...}} for changed players,
-        {'changes': {}} for unchanged players or new players.
+        Each result dict includes:
+        - 'rating_history': List of monthly rating records extracted from CBX
+        - 'new_months': List of months that are new (not in stored history)
     """
     results = []
     errors = []
@@ -843,33 +1078,37 @@ def process_batch(cbx_ids: List[str], historical_data: Dict[str, Dict] = None) -
             # Extract player name
             player_name = extract_player_name(html) or ""
 
-            # Extract ratings
-            standard_rating = extract_standard_rating(html)
-            rapid_rating = extract_rapid_rating(html)
-            blitz_rating = extract_blitz_rating(html)
+            # Extract complete rating history
+            rating_history = extract_rating_history(html)
 
             # Check if we got at least one rating or player name
-            if standard_rating is None and rapid_rating is None and blitz_rating is None and not player_name:
+            if not rating_history and not player_name:
                 errors.append(f"Unable to extract data from CBX profile (CBX ID: {cbx_id}) (skipped)")
                 continue
 
-            # Detect rating changes
-            new_ratings = {
-                'Standard': standard_rating,
-                'Rapid': rapid_rating,
-                'Blitz': blitz_rating
-            }
-            changes = detect_rating_changes(cbx_id, new_ratings, historical_data)
+            # Detect new months in history
+            new_months = detect_new_months(cbx_id, rating_history, historical_data)
+
+            # For current rating display, use the most recent month if available
+            current_standard = None
+            current_rapid = None
+            current_blitz = None
+            if rating_history:
+                latest = rating_history[0]  # First item is most recent (newest month)
+                current_standard = latest.get('standard')
+                current_rapid = latest.get('rapid')
+                current_blitz = latest.get('blitz')
 
             # Add to results
             results.append({
                 'Date': date.today().isoformat(),
                 'CBX ID': cbx_id,
                 'Player Name': player_name,
-                'Standard': standard_rating,
-                'Rapid': rapid_rating,
-                'Blitz': blitz_rating,
-                'changes': changes
+                'Standard': current_standard,
+                'Rapid': current_rapid,
+                'Blitz': current_blitz,
+                'Rating History': rating_history,
+                'New Months': new_months
             })
 
         except ConnectionError as e:

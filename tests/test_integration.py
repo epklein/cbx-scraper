@@ -25,21 +25,23 @@ class TestEndToEndFlow:
         """Test complete flow with a known valid CBX ID."""
         # Using a well-known player ID (Magnus Carlsen: 94157)
         cbx_id = "94157"
-        
+
         # Validate CBX ID
         assert cbx_scraper.validate_cbx_id(cbx_id) == True
-        
+
         # Fetch profile
         html = cbx_scraper.fetch_cbx_profile(cbx_id)
         assert html is not None
-        
-        # Extract ratings
-        standard = cbx_scraper.extract_standard_rating(html)
-        rapid = cbx_scraper.extract_rapid_rating(html)
-        blitz = cbx_scraper.extract_blitz_rating(html)
-        
-        # At least one rating should be present
-        assert standard is not None or rapid is not None or blitz is not None
+
+        # Extract rating history
+        history = cbx_scraper.extract_rating_history(html)
+
+        # At least one month should be present
+        assert len(history) > 0
+        # First month should have at least one non-None rating
+        assert (history[0].get('standard') is not None or
+                history[0].get('rapid') is not None or
+                history[0].get('blitz') is not None)
     
     def test_end_to_end_invalid_cbx_id(self):
         """Test complete flow with invalid CBX ID."""
@@ -52,21 +54,17 @@ class TestEndToEndFlow:
         """Test complete flow with non-existent CBX ID."""
         # Use a very large number that likely doesn't exist
         cbx_id = "99999999"
-        
+
         # Should pass validation
         assert cbx_scraper.validate_cbx_id(cbx_id) == True
-        
+
         # But fetch should fail or return no ratings
         html = cbx_scraper.fetch_cbx_profile(cbx_id)
         # Either None (404) or HTML with no ratings
         if html:
-            standard = cbx_scraper.extract_standard_rating(html)
-            rapid = cbx_scraper.extract_rapid_rating(html)
-            blitz = cbx_scraper.extract_blitz_rating(html)
-            # All should be None for non-existent player
-            assert standard is None
-            assert rapid is None
-            assert blitz is None
+            history = cbx_scraper.extract_rating_history(html)
+            # Should be empty for non-existent player
+            assert len(history) == 0
 
 
 @pytest.mark.integration
@@ -159,10 +157,12 @@ class TestBatchProcessing:
         assert output_file.exists()
         content = output_file.read_text(encoding='utf-8')
         assert 'Date,CBX ID,Player Name,Standard,Rapid,Blitz' in content
-        # Verify date is present
-        from datetime import date
-        today = date.today().isoformat()
-        assert today in content
+        # Verify that monthly dates are present (not today's date, but month-end dates)
+        # The CSV should contain multiple months of history for the players
+        assert '94157' in content  # CBX ID present
+        # Check that we have multiple date entries (monthly history)
+        lines = content.strip().split('\n')
+        assert len(lines) > 2  # Header + at least one data row
 
         # Verify console output
         console_output = cbx_scraper.format_console_output(results)
@@ -205,19 +205,19 @@ class TestEmailNotificationIntegration:
 
     def test_email_notification_workflow_compose_and_send(self):
         """Test complete email notification workflow: compose and send."""
-        # Create sample changes
-        changes = {
-            "Standard": (2440, 2450),
-            "Rapid": (2300, 2310)
-        }
+        from datetime import date
+
+        # Create sample rating history
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2310, "blitz": 2100},
+            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+        ]
 
         # Compose email
         subject, body = email_notifier._compose_notification_email(
             "Test Player",
             "12345678",
-            changes,
-            "player@example.com",
-            "admin@example.com"
+            rating_history
         )
 
         # Verify email content
@@ -229,17 +229,20 @@ class TestEmailNotificationIntegration:
     def test_email_notification_workflow_with_smtp_mock(self, mock_smtp_class):
         """Test complete email workflow with mocked SMTP."""
         from unittest.mock import MagicMock
+        from datetime import date
 
         mock_server = MagicMock()
         mock_smtp_class.return_value = mock_server
 
         # Compose email
-        changes = {"Standard": (2440, 2450)}
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100},
+            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Alice Smith",
             "12345678",
-            changes,
-            "alice@example.com"
+            rating_history
         )
 
         # Send email
@@ -254,7 +257,9 @@ class TestEmailNotificationIntegration:
         mock_server.sendmail.assert_called_once()
 
     def test_player_data_to_email_pipeline(self, tmp_path):
-        """Test pipeline: load player data -> detect changes -> compose email."""
+        """Test pipeline: load player data -> detect new months -> compose email."""
+        from datetime import date
+
         # Create player data CSV
         players_file = tmp_path / "players.csv"
         players_file.write_text("CBX ID,email\n12345678,alice@example.com\n87654321,bob@example.com\n")
@@ -263,8 +268,8 @@ class TestEmailNotificationIntegration:
         history_file = tmp_path / "history.csv"
         history_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-11-21,12345678,Alice Smith,2440,2300,2100\n"
-            "2025-11-21,87654321,Bob Jones,2500,2400,\n"
+            "2025-10-31,12345678,Alice Smith,2440,2300,2100\n"
+            "2025-10-31,87654321,Bob Jones,2500,2400,\n"
         )
 
         # Load player data
@@ -276,33 +281,34 @@ class TestEmailNotificationIntegration:
         historical_data = cbx_scraper.load_historical_ratings_by_player(str(history_file))
         assert len(historical_data) == 2
 
-        # Detect changes for Alice (rating increased)
-        alice_changes = cbx_scraper.detect_rating_changes(
+        # Detect new months for Alice (new month with different rating)
+        alice_scraped_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100}
+        ]
+        alice_new_months = cbx_scraper.detect_new_months(
             "12345678",
-            {"Standard": 2450, "Rapid": 2300, "Blitz": 2100},
+            alice_scraped_history,
             historical_data
         )
-        assert "Standard" in alice_changes
-        assert alice_changes["Standard"] == (2440, 2450)
+        assert len(alice_new_months) == 1
+        assert alice_new_months[0]["date"] == date(2025, 11, 30)
+        assert alice_new_months[0]["standard"] == 2450
 
-        # Compose email for Alice
-        subject, body = email_notifier._compose_notification_email(
-            "Alice Smith",
-            "12345678",
-            alice_changes,
-            player_data["12345678"]["email"]
-        )
-        assert "Alice Smith" in subject
-        assert "2440 → 2450" in body
+        # Verify email notification would be sent for Alice (has new month)
+        assert len(alice_new_months) > 0
+        assert player_data["12345678"]["email"] == "alice@example.com"
 
-        # Detect changes for Bob (no changes in Standard/Rapid)
-        bob_changes = cbx_scraper.detect_rating_changes(
+        # Detect new months for Bob (same month, no new months)
+        bob_scraped_history = [
+            {"date": date(2025, 10, 31), "standard": 2500, "rapid": 2400, "blitz": None}
+        ]
+        bob_new_months = cbx_scraper.detect_new_months(
             "87654321",
-            {"Standard": 2500, "Rapid": 2400, "Blitz": None},
+            bob_scraped_history,
             historical_data
         )
-        # Bob's standard and rapid unchanged, blitz went from None to None
-        assert len(bob_changes) == 0
+        # Bob has no new months (same as stored)
+        assert len(bob_new_months) == 0
 
     def test_batch_processing_with_change_detection(self, tmp_path):
         """Test batch processing with integrated change detection."""
@@ -329,8 +335,9 @@ class TestEmailNotificationIntegration:
 
     @patch('email_notifier.smtplib.SMTP')
     def test_complete_email_notification_workflow(self, mock_smtp_class, tmp_path):
-        """Test complete workflow: load data -> detect changes -> compose -> send emails."""
+        """Test complete workflow: load data -> detect new months -> send emails."""
         from unittest.mock import MagicMock
+        from datetime import date
 
         mock_server = MagicMock()
         mock_smtp_class.return_value = mock_server
@@ -347,8 +354,8 @@ class TestEmailNotificationIntegration:
         history_file = tmp_path / "history.csv"
         history_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-11-21,12345678,Alice Smith,2440,2300,2100\n"
-            "2025-11-21,87654321,Bob Jones,2500,2400,\n"
+            "2025-10-31,12345678,Alice Smith,2440,2300,2100\n"
+            "2025-10-31,87654321,Bob Jones,2500,2400,\n"
         )
 
         # Load player data
@@ -357,40 +364,37 @@ class TestEmailNotificationIntegration:
         # Load historical ratings
         historical_data = cbx_scraper.load_historical_ratings_by_player(str(history_file))
 
-        # Simulate new ratings
-        new_ratings_alice = {"Standard": 2450, "Rapid": 2300, "Blitz": 2100}
+        # Simulate scraped history with new month for Alice
+        alice_scraped_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100}
+        ]
 
-        # Detect changes
-        alice_changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings_alice, historical_data
+        # Detect new months
+        alice_new_months = cbx_scraper.detect_new_months(
+            "12345678", alice_scraped_history, historical_data
         )
 
-        # Only Alice has email and has changes, so compose and send for her
-        if alice_changes and player_data["12345678"]["email"]:
-            subject, body = email_notifier._compose_notification_email(
-                "Alice Smith",
-                "12345678",
-                alice_changes,
-                player_data["12345678"]["email"],
-                "admin@example.com"
-            )
+        # Only Alice has email and has new months, so send notification
+        if alice_new_months and player_data["12345678"]["email"]:
+            # Build mock result for send_batch_notifications
+            results = [{
+                "CBX ID": "12345678",
+                "Player Name": "Alice Smith",
+                "Rating History": alice_scraped_history,
+                "New Months": alice_new_months
+            }]
 
-            # Send email
-            result = email_notifier._send_email_notification(
-                player_data["12345678"]["email"],
-                "admin@example.com",
-                subject,
-                body
-            )
+            # Use the actual send_batch_notifications function
+            sent, failed = email_notifier.send_batch_notifications(results, player_data)
 
-            assert result is True
+            assert sent == 1
+            assert failed == 0
             mock_server.sendmail.assert_called()
 
             # Verify email was sent to correct recipients
             call_args = mock_server.sendmail.call_args
             recipients = call_args[0][1]
             assert "alice@example.com" in recipients
-            assert "admin@example.com" in recipients
 
 
 @patch('email_notifier.smtplib.SMTP')
@@ -398,7 +402,9 @@ class TestFullEmailNotificationPipeline:
     """Full end-to-end pipeline test for email notifications."""
 
     def test_full_pipeline_load_process_send(self, mock_smtp_class, tmp_path):
-        """Test complete pipeline: load → process → detect changes → send emails."""
+        """Test complete pipeline: load → process → detect new months → send emails."""
+        from datetime import date
+
         mock_server = MagicMock()
         mock_smtp_class.return_value = mock_server
 
@@ -416,13 +422,13 @@ class TestFullEmailNotificationPipeline:
             "22222222,charlie@example.com\n"
         )
 
-        # Create historical ratings (baseline data)
+        # Create historical ratings (baseline data - October)
         history_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-11-21,12345678,Alice Smith,2440,2300,2100\n"
-            "2025-11-21,87654321,Bob Jones,2500,2400,2200\n"
-            "2025-11-21,11111111,Charlie Brown,2340,2240,2140\n"
-            "2025-11-21,22222222,Diana Prince,2600,2550,2500\n"
+            "2025-10-31,12345678,Alice Smith,2440,2300,2100\n"
+            "2025-10-31,87654321,Bob Jones,2500,2400,2200\n"
+            "2025-10-31,11111111,Charlie Brown,2340,2240,2140\n"
+            "2025-10-31,22222222,Diana Prince,2600,2550,2500\n"
         )
 
         # Step 1: Load player data
@@ -439,29 +445,29 @@ class TestFullEmailNotificationPipeline:
         historical_data = cbx_scraper.load_historical_ratings_by_player(str(history_file))
         assert len(historical_data) == 4
 
-        # Step 3: Simulate new ratings (some changed, some unchanged)
-        new_ratings = {
-            "12345678": {"Standard": 2450, "Rapid": 2300, "Blitz": 2100},  # Standard increased
-            "87654321": {"Standard": 2500, "Rapid": 2410, "Blitz": 2200},  # Rapid increased
-            "11111111": {"Standard": 2340, "Rapid": 2240, "Blitz": 2140},  # No changes
-            "22222222": {"Standard": 2600, "Rapid": 2550, "Blitz": 2500},  # No changes
+        # Step 3: Simulate scraped history (some with new months, some without)
+        scraped_histories = {
+            "12345678": [{"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100}],  # New month
+            "87654321": [{"date": date(2025, 11, 30), "standard": 2500, "rapid": 2410, "blitz": 2200}],  # New month
+            "11111111": [{"date": date(2025, 10, 31), "standard": 2340, "rapid": 2240, "blitz": 2140}],  # Same month
+            "22222222": [{"date": date(2025, 10, 31), "standard": 2600, "rapid": 2550, "blitz": 2500}],  # Same month
         }
 
-        # Step 4: Detect changes for each player
-        all_changes = {}
-        for cbx_id, new_rating in new_ratings.items():
-            changes = cbx_scraper.detect_rating_changes(
-                cbx_id, new_rating, historical_data
+        # Step 4: Detect new months for each player
+        all_new_months = {}
+        for cbx_id, scraped_history in scraped_histories.items():
+            new_months = cbx_scraper.detect_new_months(
+                cbx_id, scraped_history, historical_data
             )
-            all_changes[cbx_id] = changes
+            all_new_months[cbx_id] = new_months
 
-        # Verify change detection
-        assert "Standard" in all_changes["12345678"]  # Alice's Standard increased
-        assert "Rapid" in all_changes["87654321"]     # Bob's Rapid increased
-        assert len(all_changes["11111111"]) == 0      # Charlie no changes
-        assert len(all_changes["22222222"]) == 0      # Diana no changes
+        # Verify new month detection
+        assert len(all_new_months["12345678"]) == 1  # Alice has new month
+        assert len(all_new_months["87654321"]) == 1  # Bob has new month
+        assert len(all_new_months["11111111"]) == 0  # Charlie no new months
+        assert len(all_new_months["22222222"]) == 0  # Diana no new months
 
-        # Step 5: Process and send emails for players with changes and valid emails
+        # Step 5: Build results for batch notifications
         player_names = {
             "12345678": "Alice Smith",
             "87654321": "Bob Jones",
@@ -469,34 +475,21 @@ class TestFullEmailNotificationPipeline:
             "22222222": "Diana Prince"
         }
 
-        admin_email = "admin@example.com"
-        emails_sent = 0
+        results = []
+        for cbx_id, new_months in all_new_months.items():
+            results.append({
+                "CBX ID": cbx_id,
+                "Player Name": player_names[cbx_id],
+                "Rating History": scraped_histories[cbx_id],
+                "New Months": new_months
+            })
 
-        for cbx_id, changes in all_changes.items():
-            email = player_data[cbx_id]["email"]
-
-            # Only send if player has email and has changes
-            if email and changes:
-                subject, body = email_notifier._compose_notification_email(
-                    player_names[cbx_id],
-                    cbx_id,
-                    changes,
-                    email,
-                    admin_email
-                )
-
-                result = email_notifier._send_email_notification(
-                    email,
-                    admin_email,
-                    subject,
-                    body
-                )
-
-                if result:
-                    emails_sent += 1
+        # Send batch notifications
+        sent, failed = email_notifier.send_batch_notifications(results, player_data)
 
         # Verify emails were sent
-        assert emails_sent == 2  # Only Alice and Bob should get emails
+        assert sent == 2  # Only Alice and Bob should get emails (have new months and emails)
+        assert failed == 0
         assert mock_server.sendmail.call_count == 2
 
         # Step 6: Verify email recipients
@@ -511,12 +504,13 @@ class TestFullEmailNotificationPipeline:
         # Verify correct recipients received emails
         assert "alice@example.com" in all_recipients
         assert "bob@example.com" in all_recipients
-        assert "admin@example.com" in all_recipients  # Admin should be CC'd
         # Opted-out and unchanged players should not be recipients
         assert "charlie@example.com" not in all_recipients or len([c for c in all_calls if "charlie@example.com" in c[0][1]]) == 0
 
     def test_full_pipeline_first_run_no_history(self, mock_smtp_class, tmp_path):
         """Test pipeline on first run with no historical data."""
+        from datetime import date
+
         mock_server = MagicMock()
         mock_smtp_class.return_value = mock_server
 
@@ -541,22 +535,35 @@ class TestFullEmailNotificationPipeline:
         # Historical data should be empty
         assert len(historical_data) == 0
 
-        # Simulate new ratings
-        new_ratings = {"Standard": 2400, "Rapid": 2300, "Blitz": 2100}
+        # Simulate scraped history (first run - all months are new)
+        scraped_history = [{"date": date(2025, 11, 30), "standard": 2400, "rapid": 2300, "blitz": 2100}]
 
-        # Detect changes (should be empty since no history)
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
+        # Detect new months (all months should be new on first run)
+        new_months = cbx_scraper.detect_new_months(
+            "12345678", scraped_history, historical_data
         )
 
-        # No changes should be detected (new player)
-        assert changes == {"Standard": (None, 2400), "Rapid": (None, 2300), "Blitz": (None, 2100)}
+        # All months should be detected as new (first run)
+        assert len(new_months) == 1
+        assert new_months[0]["date"] == date(2025, 11, 30)
+        assert new_months[0]["standard"] == 2400
 
-        # No emails should be sent
-        assert mock_server.sendmail.call_count == 0
+        # Emails SHOULD be sent on first run (new months detected)
+        results = [{
+            "CBX ID": "12345678",
+            "Player Name": "Alice Smith",
+            "Rating History": scraped_history,
+            "New Months": new_months
+        }]
+
+        sent, failed = email_notifier.send_batch_notifications(results, player_data)
+        assert sent == 1  # Email sent for first run with new month
+        assert mock_server.sendmail.call_count == 1
 
     def test_full_pipeline_with_all_rating_types_changed(self, mock_smtp_class, tmp_path):
-        """Test pipeline when all rating types change."""
+        """Test pipeline with new month showing all rating types."""
+        from datetime import date
+
         mock_server = MagicMock()
         mock_smtp_class.return_value = mock_server
 
@@ -568,49 +575,47 @@ class TestFullEmailNotificationPipeline:
 
         history_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-11-21,12345678,Alice Smith,2440,2300,2100\n"
+            "2025-10-31,12345678,Alice Smith,2440,2300,2100\n"
         )
 
         # Load data
         player_data = cbx_scraper.load_player_data_from_csv(str(players_file))
         historical_data = cbx_scraper.load_historical_ratings_by_player(str(history_file))
 
-        # Simulate large rating changes in all categories
-        new_ratings = {"Standard": 2500, "Rapid": 2400, "Blitz": 2250}
+        # Simulate scraped history with new month showing large rating changes
+        scraped_history = [{"date": date(2025, 11, 30), "standard": 2500, "rapid": 2400, "blitz": 2250}]
 
-        # Detect changes
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
+        # Detect new months
+        new_months = cbx_scraper.detect_new_months(
+            "12345678", scraped_history, historical_data
         )
 
-        # All three rating types should show changes
-        assert len(changes) == 3
-        assert changes["Standard"] == (2440, 2500)
-        assert changes["Rapid"] == (2300, 2400)
-        assert changes["Blitz"] == (2100, 2250)
+        # Should detect one new month
+        assert len(new_months) == 1
+        assert new_months[0]["date"] == date(2025, 11, 30)
+        assert new_months[0]["standard"] == 2500
+        assert new_months[0]["rapid"] == 2400
+        assert new_months[0]["blitz"] == 2250
 
-        # Compose and send email
-        subject, body = email_notifier._compose_notification_email(
-            "Alice Smith",
-            "12345678",
-            changes,
-            "alice@example.com",
-            "admin@example.com"
-        )
+        # Send notification
+        results = [{
+            "CBX ID": "12345678",
+            "Player Name": "Alice Smith",
+            "Rating History": scraped_history,
+            "New Months": new_months
+        }]
 
-        result = email_notifier._send_email_notification(
-            "alice@example.com",
-            "admin@example.com",
-            subject,
-            body
-        )
+        sent, failed = email_notifier.send_batch_notifications(results, player_data)
 
         # Email should be sent successfully
-        assert result is True
+        assert sent == 1
+        assert failed == 0
         assert mock_server.sendmail.call_count == 1
 
     def test_full_pipeline_unrated_becomes_rated(self, mock_smtp_class, tmp_path):
-        """Test pipeline when player transitions from unrated to rated."""
+        """Test pipeline when player gets first rated month."""
+        from datetime import date
+
         mock_server = MagicMock()
         mock_smtp_class.return_value = mock_server
 
@@ -622,39 +627,41 @@ class TestFullEmailNotificationPipeline:
 
         history_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-11-21,12345678,Alice Smith,,,,\n"
+            "2025-10-31,12345678,Alice Smith,,,\n"
         )
 
         # Load data
         player_data = cbx_scraper.load_player_data_from_csv(str(players_file))
         historical_data = cbx_scraper.load_historical_ratings_by_player(str(history_file))
 
-        # Player now has ratings
-        new_ratings = {"Standard": 2400, "Rapid": 2300, "Blitz": 2100}
+        # Player now has ratings in a new month
+        scraped_history = [{"date": date(2025, 11, 30), "standard": 2400, "rapid": 2300, "blitz": 2100}]
 
-        # Detect changes
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
+        # Detect new months
+        new_months = cbx_scraper.detect_new_months(
+            "12345678", scraped_history, historical_data
         )
 
-        # All ratings are new (unrated → rated)
-        assert len(changes) == 3
-        assert changes["Standard"] == (None, 2400)
-        assert changes["Rapid"] == (None, 2300)
-        assert changes["Blitz"] == (None, 2100)
+        # Should detect the new month with ratings
+        assert len(new_months) == 1
+        assert new_months[0]["date"] == date(2025, 11, 30)
+        assert new_months[0]["standard"] == 2400
+        assert new_months[0]["rapid"] == 2300
+        assert new_months[0]["blitz"] == 2100
 
-        # Compose email to notify about new ratings
-        subject, body = email_notifier._compose_notification_email(
-            "Alice Smith",
-            "12345678",
-            changes,
-            "alice@example.com"
-        )
+        # Send notification
+        results = [{
+            "CBX ID": "12345678",
+            "Player Name": "Alice Smith",
+            "Rating History": scraped_history,
+            "New Months": new_months
+        }]
 
-        # Verify email mentions the transitions
-        assert "unrated → 2400" in body
-        assert "unrated → 2300" in body
-        assert "unrated → 2100" in body
+        sent, failed = email_notifier.send_batch_notifications(results, player_data)
+
+        # Email should be sent
+        assert sent == 1
+        assert failed == 0
 
 
 class TestSendBatchNotifications:
@@ -662,7 +669,9 @@ class TestSendBatchNotifications:
 
     @patch('email_notifier.smtplib.SMTP')
     def test_send_batch_notifications_with_changes(self, mock_smtp_class):
-        """Test sending batch notifications to players with changes."""
+        """Test sending batch notifications to players with new months."""
+        from datetime import date
+
         mock_server = MagicMock()
         mock_smtp_class.return_value = mock_server
 
@@ -680,7 +689,11 @@ class TestSendBatchNotifications:
                 "Standard": 2450,
                 "Rapid": 2300,
                 "Blitz": 2100,
-                "changes": {"Standard": (2440, 2450)}  # Has changes
+                "Rating History": [
+                    {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100},
+                    {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+                ],
+                "New Months": [{"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100}]  # Has new month
             },
             {
                 "CBX ID": "87654321",
@@ -688,7 +701,10 @@ class TestSendBatchNotifications:
                 "Standard": 2500,
                 "Rapid": 2400,
                 "Blitz": 2200,
-                "changes": {}  # No changes
+                "Rating History": [
+                    {"date": date(2025, 11, 30), "standard": 2500, "rapid": 2400, "blitz": 2200}
+                ],
+                "New Months": []  # No new months
             },
             {
                 "CBX ID": "11111111",
@@ -696,7 +712,10 @@ class TestSendBatchNotifications:
                 "Standard": 2340,
                 "Rapid": 2240,
                 "Blitz": 2140,
-                "changes": {"Standard": (2330, 2340)}  # Has changes but no email
+                "Rating History": [
+                    {"date": date(2025, 11, 30), "standard": 2340, "rapid": 2240, "blitz": 2140}
+                ],
+                "New Months": [{"date": date(2025, 11, 30), "standard": 2340, "rapid": 2240, "blitz": 2140}]  # Has new month but no email
             }
         ]
 
@@ -706,14 +725,16 @@ class TestSendBatchNotifications:
             player_data
         )
 
-        # Should send 1 (Alice), skip Bob (no changes), skip Charlie (no email)
+        # Should send 1 (Alice), skip Bob (no new months), skip Charlie (no email)
         assert sent == 1
         assert failed == 0
         assert mock_server.sendmail.call_count == 1
 
     @patch('email_notifier.smtplib.SMTP')
     def test_send_batch_notifications_all_changes(self, mock_smtp_class):
-        """Test sending notifications when all players have changes."""
+        """Test sending notifications when all players have new months."""
+        from datetime import date
+
         mock_server = MagicMock()
         mock_smtp_class.return_value = mock_server
 
@@ -727,13 +748,21 @@ class TestSendBatchNotifications:
                 "CBX ID": "12345678",
                 "Player Name": "Alice Smith",
                 "Standard": 2450,
-                "changes": {"Standard": (2440, 2450)}
+                "Rating History": [
+                    {"date": date(2025, 11, 30), "standard": 2450, "rapid": None, "blitz": None},
+                    {"date": date(2025, 10, 31), "standard": 2440, "rapid": None, "blitz": None}
+                ],
+                "New Months": [{"date": date(2025, 11, 30), "standard": 2450, "rapid": None, "blitz": None}]
             },
             {
                 "CBX ID": "87654321",
                 "Player Name": "Bob Jones",
                 "Standard": 2510,
-                "changes": {"Standard": (2500, 2510)}
+                "Rating History": [
+                    {"date": date(2025, 11, 30), "standard": 2510, "rapid": None, "blitz": None},
+                    {"date": date(2025, 10, 31), "standard": 2500, "rapid": None, "blitz": None}
+                ],
+                "New Months": [{"date": date(2025, 11, 30), "standard": 2510, "rapid": None, "blitz": None}]
             },
         ]
 
@@ -748,7 +777,9 @@ class TestSendBatchNotifications:
 
     @patch('email_notifier.smtplib.SMTP')
     def test_send_batch_notifications_no_changes(self, mock_smtp_class):
-        """Test sending notifications when no players have changes."""
+        """Test sending notifications when no players have new months."""
+        from datetime import date
+
         mock_server = MagicMock()
         mock_smtp_class.return_value = mock_server
 
@@ -762,13 +793,19 @@ class TestSendBatchNotifications:
                 "CBX ID": "12345678",
                 "Player Name": "Alice Smith",
                 "Standard": 2440,
-                "changes": {}  # No changes
+                "Rating History": [
+                    {"date": date(2025, 11, 30), "standard": 2440, "rapid": None, "blitz": None}
+                ],
+                "New Months": []  # No new months
             },
             {
                 "CBX ID": "87654321",
                 "Player Name": "Bob Jones",
                 "Standard": 2500,
-                "changes": {}  # No changes
+                "Rating History": [
+                    {"date": date(2025, 11, 30), "standard": 2500, "rapid": None, "blitz": None}
+                ],
+                "New Months": []  # No new months
             },
         ]
 
@@ -784,6 +821,8 @@ class TestSendBatchNotifications:
     @patch('email_notifier.smtplib.SMTP')
     def test_send_batch_notifications_with_errors(self, mock_smtp_class):
         """Test handling errors during batch notification sending."""
+        from datetime import date
+
         mock_server = MagicMock()
         mock_smtp_class.return_value = mock_server
         # First call succeeds, second fails
@@ -799,13 +838,21 @@ class TestSendBatchNotifications:
                 "CBX ID": "12345678",
                 "Player Name": "Alice Smith",
                 "Standard": 2450,
-                "changes": {"Standard": (2440, 2450)}
+                "Rating History": [
+                    {"date": date(2025, 11, 30), "standard": 2450, "rapid": None, "blitz": None},
+                    {"date": date(2025, 10, 31), "standard": 2440, "rapid": None, "blitz": None}
+                ],
+                "New Months": [{"date": date(2025, 11, 30), "standard": 2450, "rapid": None, "blitz": None}]
             },
             {
                 "CBX ID": "87654321",
                 "Player Name": "Bob Jones",
                 "Standard": 2510,
-                "changes": {"Standard": (2500, 2510)}
+                "Rating History": [
+                    {"date": date(2025, 11, 30), "standard": 2510, "rapid": None, "blitz": None},
+                    {"date": date(2025, 10, 31), "standard": 2500, "rapid": None, "blitz": None}
+                ],
+                "New Months": [{"date": date(2025, 11, 30), "standard": 2510, "rapid": None, "blitz": None}]
             },
         ]
 

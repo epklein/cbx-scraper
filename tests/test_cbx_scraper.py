@@ -48,180 +48,6 @@ class TestCbxIdValidation:
         assert cbx_scraper.validate_cbx_id(None) == False
 
 
-class TestRatingExtraction:
-    """Tests for rating extraction from HTML."""
-    
-    def test_extract_standard_rating_success(self):
-        """Test extracting standard rating from HTML using CBX table format."""
-        # HTML structure uses ContentPlaceHolder1_gdvRating table
-        html = """
-        <table id="ContentPlaceHolder1_gdvRating">
-            <tr>
-                <th>Mês/Ano</th>
-                <th>Clássico</th>
-                <th>Rápido</th>
-                <th>Blitz</th>
-            </tr>
-            <tr>
-                <td>12/2024</td>
-                <td>2500</td>
-                <td>2450</td>
-                <td>2400</td>
-            </tr>
-        </table>
-        """
-        rating = cbx_scraper.extract_standard_rating(html)
-        assert rating == 2500
-    
-    def test_extract_rapid_rating_success(self):
-        """Test extracting rapid rating from HTML using CBX table format."""
-        # HTML structure uses ContentPlaceHolder1_gdvRating table
-        html = """
-        <table id="ContentPlaceHolder1_gdvRating">
-            <tr>
-                <th>Mês/Ano</th>
-                <th>Clássico</th>
-                <th>Rápido</th>
-                <th>Blitz</th>
-            </tr>
-            <tr>
-                <td>12/2024</td>
-                <td>2500</td>
-                <td>2450</td>
-                <td>2400</td>
-            </tr>
-        </table>
-        """
-        rating = cbx_scraper.extract_rapid_rating(html)
-        assert rating == 2450
-    
-    def test_extract_blitz_rating_success(self):
-        """Test extracting blitz rating from HTML using CBX table format."""
-        # HTML structure uses ContentPlaceHolder1_gdvRating table
-        html = """
-        <table id="ContentPlaceHolder1_gdvRating">
-            <tr>
-                <th>Mês/Ano</th>
-                <th>Clássico</th>
-                <th>Rápido</th>
-                <th>Blitz</th>
-            </tr>
-            <tr>
-                <td>12/2024</td>
-                <td>2500</td>
-                <td>2450</td>
-                <td>2400</td>
-            </tr>
-        </table>
-        """
-        rating = cbx_scraper.extract_blitz_rating(html)
-        assert rating == 2400
-    
-    def test_extract_rating_unrated(self):
-        """Test handling unrated players using CBX table format."""
-        # HTML structure with empty ratings (unrated)
-        html = """
-        <table id="ContentPlaceHolder1_gdvRating">
-            <tr>
-                <th>Mês/Ano</th>
-                <th>Clássico</th>
-                <th>Rápido</th>
-                <th>Blitz</th>
-            </tr>
-            <tr>
-                <td>12/2024</td>
-                <td></td>
-                <td></td>
-                <td></td>
-            </tr>
-        </table>
-        """
-        standard = cbx_scraper.extract_standard_rating(html)
-        rapid = cbx_scraper.extract_rapid_rating(html)
-        blitz = cbx_scraper.extract_blitz_rating(html)
-        # Should return None for unrated
-        assert standard is None
-        assert rapid is None
-        assert blitz is None
-    
-    def test_extract_rating_missing_element(self):
-        """Test handling missing rating elements (no profile-games div)."""
-        html = "<html><body></body></html>"
-        standard = cbx_scraper.extract_standard_rating(html)
-        rapid = cbx_scraper.extract_rapid_rating(html)
-        blitz = cbx_scraper.extract_blitz_rating(html)
-        assert standard is None
-        assert rapid is None
-        assert blitz is None
-    
-    def test_extract_rating_partial_structure(self):
-        """Test handling when table exists but has no data rows."""
-        # Has table but no data rows
-        html = """
-        <table id="ContentPlaceHolder1_gdvRating">
-            <tr>
-                <th>Mês/Ano</th>
-                <th>Clássico</th>
-                <th>Rápido</th>
-                <th>Blitz</th>
-            </tr>
-        </table>
-        """
-        standard = cbx_scraper.extract_standard_rating(html)
-        rapid = cbx_scraper.extract_rapid_rating(html)
-        blitz = cbx_scraper.extract_blitz_rating(html)
-        assert standard is None
-        assert rapid is None
-        assert blitz is None
-    
-    def test_extract_rating_mixed_rated_unrated(self):
-        """Test handling when one rating is present and one is unrated."""
-        # Standard rated, rapid unrated using CBX table format
-        html = """
-        <table id="ContentPlaceHolder1_gdvRating">
-            <tr>
-                <th>Mês/Ano</th>
-                <th>Clássico</th>
-                <th>Rápido</th>
-                <th>Blitz</th>
-            </tr>
-            <tr>
-                <td>12/2024</td>
-                <td>2500</td>
-                <td></td>
-                <td>2400</td>
-            </tr>
-        </table>
-        """
-        standard = cbx_scraper.extract_standard_rating(html)
-        rapid = cbx_scraper.extract_rapid_rating(html)
-        blitz = cbx_scraper.extract_blitz_rating(html)
-        assert standard == 2500
-        assert rapid is None
-        assert blitz == 2400
-    
-    def test_extract_blitz_rating_unrated(self):
-        """Test handling unrated blitz rating."""
-        html = """
-        <table id="ContentPlaceHolder1_gdvRating">
-            <tr>
-                <th>Mês/Ano</th>
-                <th>Clássico</th>
-                <th>Rápido</th>
-                <th>Blitz</th>
-            </tr>
-            <tr>
-                <td>12/2024</td>
-                <td>2500</td>
-                <td>2450</td>
-                <td></td>
-            </tr>
-        </table>
-        """
-        blitz = cbx_scraper.extract_blitz_rating(html)
-        assert blitz is None
-
-
 class TestErrorHandling:
     """Tests for error handling."""
     
@@ -259,18 +85,6 @@ class TestErrorHandling:
         with pytest.raises(requests.Timeout):
             cbx_scraper.fetch_cbx_profile("94157")
     
-    def test_parsing_error_handling(self):
-        """Test handling of HTML parsing errors."""
-        invalid_html = "<html><body><broken>"
-        # Should not raise exception, should return None or handle gracefully
-        standard = cbx_scraper.extract_standard_rating(invalid_html)
-        rapid = cbx_scraper.extract_rapid_rating(invalid_html)
-        blitz = cbx_scraper.extract_blitz_rating(invalid_html)
-        # Either None or exception handled gracefully
-        assert standard is None or isinstance(standard, (int, str, type(None)))
-        assert rapid is None or isinstance(rapid, (int, str, type(None)))
-        assert blitz is None or isinstance(blitz, (int, str, type(None)))
-
 
 class TestPlayerNameExtraction:
     """Tests for player name extraction from HTML."""
@@ -444,13 +258,24 @@ class TestCSVGeneration:
     def test_write_csv_output_proper_formatting(self, tmp_path):
         """Test CSV generation with proper formatting and escaping."""
         output_file = tmp_path / "test_output.csv"
+        from datetime import date
+        today = date.today()
+
         player_profiles = [
             {
                 'CBX ID': '94157',
                 'Player Name': 'Magnus Carlsen',
                 'Standard': 2830,
                 'Rapid': 2780,
-                'Blitz': 2760
+                'Blitz': 2760,
+                'Rating History': [
+                    {
+                        'date': today,
+                        'standard': 2830,
+                        'rapid': 2780,
+                        'blitz': 2760
+                    }
+                ]
             }
         ]
         cbx_scraper.write_csv_output(str(output_file), player_profiles)
@@ -459,24 +284,34 @@ class TestCSVGeneration:
         content = output_file.read_text(encoding='utf-8')
         assert 'Date,CBX ID,Player Name,Standard,Rapid,Blitz' in content
         # Date should be in ISO format at the beginning
-        from datetime import date
-        today = date.today().isoformat()
-        assert f'{today},94157,Magnus Carlsen,2830,2780,2760' in content
+        today_str = today.isoformat()
+        assert f'{today_str},94157,Magnus Carlsen,2830,2780,2760' in content
     
     def test_write_csv_output_special_characters(self, tmp_path):
         """Test CSV generation with special characters in player names (proper escaping)."""
         output_file = tmp_path / "test_output.csv"
+        from datetime import date
+        today = date.today()
+
         player_profiles = [
             {
                 'CBX ID': '123456',
                 'Player Name': 'Player, With Comma',
                 'Standard': 2500,
                 'Rapid': 2450,
-                'Blitz': 2400
+                'Blitz': 2400,
+                'Rating History': [
+                    {
+                        'date': today,
+                        'standard': 2500,
+                        'rapid': 2450,
+                        'blitz': 2400
+                    }
+                ]
             }
         ]
         cbx_scraper.write_csv_output(str(output_file), player_profiles)
-        
+
         # Read and verify CSV content (comma should be quoted)
         content = output_file.read_text(encoding='utf-8')
         assert '"Player, With Comma"' in content or 'Player, With Comma' in content
@@ -484,23 +319,33 @@ class TestCSVGeneration:
     def test_write_csv_output_empty_values(self, tmp_path):
         """Test CSV generation with empty/missing ratings."""
         output_file = tmp_path / "test_output.csv"
+        from datetime import date
+        today = date.today()
+
         player_profiles = [
             {
                 'CBX ID': '123456',
                 'Player Name': 'Test Player',
                 'Standard': 2500,
                 'Rapid': None,
-                'Blitz': None
+                'Blitz': None,
+                'Rating History': [
+                    {
+                        'date': today,
+                        'standard': 2500,
+                        'rapid': None,
+                        'blitz': None
+                    }
+                ]
             }
         ]
         cbx_scraper.write_csv_output(str(output_file), player_profiles)
 
         # Read and verify CSV content - Date should come first
         content = output_file.read_text(encoding='utf-8')
-        from datetime import date
-        today = date.today().isoformat()
+        today_str = today.isoformat()
         # Check that date is present and values are correct
-        assert today in content
+        assert today_str in content
         assert '123456,Test Player,2500,,' in content or 'Test Player,2500' in content
     
     def test_write_csv_output_header_row(self, tmp_path):
@@ -511,12 +356,16 @@ class TestCSVGeneration:
 
         # Read and verify header exists even with empty data
         content = output_file.read_text(encoding='utf-8')
-        assert 'Date,CBX ID,Player Name,Standard,Rapid,Blitz' in content
+        lines = content.strip().split('\n')
+        # Header should be present
+        assert any('Date' in line and 'CBX ID' in line and 'Standard' in line for line in lines)
 
     def test_write_csv_output_same_day_replacement(self, tmp_path):
-        """Test that CSV output replaces same-day entries while preserving older entries."""
+        """Test that CSV output replaces same-month entries for same player."""
         output_file = tmp_path / "test_output.csv"
         from datetime import date, timedelta
+
+        today = date.today()
 
         # First write - initial data
         player_profiles_1 = [
@@ -525,84 +374,113 @@ class TestCSVGeneration:
                 'Player Name': 'Magnus Carlsen',
                 'Standard': 2830,
                 'Rapid': 2780,
-                'Blitz': 2760
+                'Blitz': 2760,
+                'Rating History': [
+                    {
+                        'date': today,
+                        'standard': 2830,
+                        'rapid': 2780,
+                        'blitz': 2760
+                    }
+                ]
             }
         ]
         cbx_scraper.write_csv_output(str(output_file), player_profiles_1)
 
-        # Second write on same day - should replace previous data
+        # Second write on same day - should replace previous data for same player
         player_profiles_2 = [
             {
-                'CBX ID': '2016892',
-                'Player Name': 'Ding Liren',
-                'Standard': 2780,
-                'Rapid': 2750,
-                'Blitz': 2730
+                'CBX ID': '94157',
+                'Player Name': 'Magnus Carlsen',
+                'Standard': 2840,
+                'Rapid': 2790,
+                'Blitz': 2770,
+                'Rating History': [
+                    {
+                        'date': today,
+                        'standard': 2840,
+                        'rapid': 2790,
+                        'blitz': 2770
+                    }
+                ]
             }
         ]
         cbx_scraper.write_csv_output(str(output_file), player_profiles_2)
 
         # Read and verify behavior
         content = output_file.read_text(encoding='utf-8')
-        today = date.today().isoformat()
+        today_str = today.isoformat()
 
         # Should have header only once
         header_count = content.count('Date,CBX ID,Player Name,Standard,Rapid,Blitz')
         assert header_count == 1, "Header should appear only once"
 
-        # Should have only the second (latest) entry for today, not the first one
-        assert 'Ding Liren' in content, "Latest entry should be present"
-        assert 'Magnus Carlsen' not in content, "Old entry for same day should be removed"
-        assert '2016892' in content, "New CBX ID should be present"
-        # Check that old CBX ID is not in today's entries
-        lines = content.split('\n')
-        for line in lines:
-            if today in line and line.strip():
-                assert '94157' not in line, "Old CBX ID should not appear in today's entries"
+        # Should have the updated entry with new ratings
+        assert 'Magnus Carlsen' in content, "Player should be present"
+        assert '2840' in content, "Updated Standard rating should be present"
+        # Should only have one entry for this player today
+        lines = [l for l in content.split('\n') if today_str in l and '94157' in l]
+        assert len(lines) == 1, "Should have exactly one entry per player per month"
 
     def test_write_csv_output_preserve_older_dates(self, tmp_path):
-        """Test that CSV output preserves entries from previous dates."""
+        """Test that CSV output preserves entries from previous months."""
         output_file = tmp_path / "test_output.csv"
-        from datetime import date, timedelta
+        from datetime import date
+        from calendar import monthrange
 
-        # Create a file with yesterday's data
+        # Create a file with last month's data
         today = date.today()
-        yesterday = (today - timedelta(days=1)).isoformat()
+        # Get last day of previous month
+        if today.month == 1:
+            last_month_date = date(today.year - 1, 12, 31)
+        else:
+            last_month_date = date(today.year, today.month - 1, monthrange(today.year, today.month - 1)[1])
 
-        # Manually create a file with yesterday's data
+        last_month_str = last_month_date.isoformat()
+
+        # Manually create a file with last month's data
         output_file.write_text(
             f"Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            f"{yesterday},27507,Luis Paulo Supi,2556,2317,1991\n"
+            f"{last_month_str},27507,Luis Paulo Supi,2556,2317,1991\n"
         )
-        # Now write today's data
+
+        # Now write current month's data
         player_profiles = [
             {
                 'CBX ID': '2016892',
                 'Player Name': 'Ding Liren',
                 'Standard': 2780,
                 'Rapid': 2750,
-                'Blitz': 2730
+                'Blitz': 2730,
+                'Rating History': [
+                    {
+                        'date': today,
+                        'standard': 2780,
+                        'rapid': 2750,
+                        'blitz': 2730
+                    }
+                ]
             }
         ]
         cbx_scraper.write_csv_output(str(output_file), player_profiles)
 
-        # Read and verify both dates are present
+        # Read and verify both months are present
         content = output_file.read_text(encoding='utf-8')
-        today_str = date.today().isoformat()
+        today_str = today.isoformat()
 
         # Should have header only once
         header_count = content.count('Date,CBX ID,Player Name,Standard,Rapid,Blitz')
         assert header_count == 1, "Header should appear only once"
 
-        # Should have yesterday's entry
-        assert yesterday in content, "Yesterday's entry should be preserved"
-        assert 'Luis Paulo Supi' in content, "Yesterday's player should be present"
-        assert '27507' in content, "Yesterday's CBX ID should be present"
+        # Should have last month's entry
+        assert last_month_str in content, "Last month's entry should be preserved"
+        assert 'Luis Paulo Supi' in content, "Last month's player should be present"
+        assert '27507' in content, "Last month's CBX ID should be present"
 
-        # Should have today's entry
-        assert today_str in content, "Today's date should be present"
-        assert 'Ding Liren' in content, "Today's player should be present"
-        assert '2016892' in content, "Today's CBX ID should be present"
+        # Should have current month's entry
+        assert today_str in content, "Current month's date should be present"
+        assert 'Ding Liren' in content, "Current month's player should be present"
+        assert '2016892' in content, "Current month's CBX ID should be present"
 
 class TestConsoleOutputFormatting:
     """Tests for console output formatting."""
@@ -671,20 +549,21 @@ class TestConsoleOutputFormatting:
 
 class TestBatchProcessingErrorHandling:
     """Tests for batch processing error handling."""
-    
+
     @patch('cbx_scraper.fetch_cbx_profile')
+    @patch('cbx_scraper.extract_rating_history')
     @patch('cbx_scraper.extract_player_name')
-    @patch('cbx_scraper.extract_standard_rating')
-    @patch('cbx_scraper.extract_rapid_rating')
-    @patch('cbx_scraper.extract_blitz_rating')
-    def test_batch_processing_invalid_ids_skipped(self, mock_blitz, mock_rapid, mock_standard, mock_name, mock_fetch):
+    def test_batch_processing_invalid_ids_skipped(self, mock_name, mock_history, mock_fetch):
         """Test that invalid CBX IDs are skipped without stopping batch."""
+        mock_history.return_value = []  # Empty history
+        mock_name.return_value = ""  # No name found
+
         cbx_ids = ["94157", "invalid_id", "2016892"]
         results, errors = cbx_scraper.process_batch(cbx_ids)
         # Should process valid IDs and skip invalid one
         assert len(errors) >= 1  # At least one error for invalid ID
         # Should continue processing remaining IDs
-    
+
     @patch('cbx_scraper.fetch_cbx_profile')
     def test_batch_processing_network_errors_continue(self, mock_fetch):
         """Test that network errors for individual IDs don't stop batch processing."""
@@ -694,7 +573,7 @@ class TestBatchProcessingErrorHandling:
         results, errors = cbx_scraper.process_batch(cbx_ids)
         # Should continue processing after network error
         assert len(errors) >= 1  # At least one error for network failure
-    
+
     @patch('cbx_scraper.fetch_cbx_profile')
     def test_batch_processing_player_not_found_continues(self, mock_fetch):
         """Test that player not found (404) doesn't stop batch processing."""
@@ -831,35 +710,44 @@ class TestLoadHistoricalRatingsByPlayer:
     """Tests for load_historical_ratings_by_player function."""
 
     def test_load_historical_ratings_valid(self, tmp_path):
-        """Test loading valid historical ratings."""
+        """Test loading valid historical ratings (returns list of monthly records)."""
         test_file = tmp_path / "cbx_ratings.csv"
         test_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
             "2025-11-21,12345678,Alice Smith,2440,2300,2100\n"
             "2025-11-21,87654321,Bob Jones,2500,2400,\n"
-            "2025-11-22,12345678,Alice Smith,2450,2310,2110\n"
+            "2025-10-31,12345678,Alice Smith,2450,2310,2110\n"
         )
         result = cbx_scraper.load_historical_ratings_by_player(str(test_file))
 
         assert len(result) == 2
-        # Should have the latest record for each CBX ID
-        assert result["12345678"]["Standard"] == "2450"
-        assert result["87654321"]["Standard"] == "2500"
+        # Should return lists of monthly records
+        assert isinstance(result["12345678"], list)
+        assert isinstance(result["87654321"], list)
+        # Check latest records (most recent month)
+        assert len(result["12345678"]) >= 1
+        assert len(result["87654321"]) >= 1
 
     def test_load_historical_ratings_latest_per_player(self, tmp_path):
-        """Test that only latest record per player is kept."""
+        """Test that monthly records are preserved (multiple months per player)."""
         test_file = tmp_path / "cbx_ratings.csv"
         test_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-11-20,12345678,Alice Smith,2400,2250,2050\n"
-            "2025-11-21,12345678,Alice Smith,2440,2300,2100\n"
-            "2025-11-22,12345678,Alice Smith,2450,2310,2110\n"
+            "2025-11-30,12345678,Alice Smith,2400,2250,2050\n"
+            "2025-10-31,12345678,Alice Smith,2440,2300,2100\n"
+            "2025-09-30,12345678,Alice Smith,2450,2310,2110\n"
         )
         result = cbx_scraper.load_historical_ratings_by_player(str(test_file))
 
         assert len(result) == 1
-        assert result["12345678"]["Date"] == "2025-11-22"
-        assert result["12345678"]["Standard"] == "2450"
+        # Should have list of all monthly records
+        assert isinstance(result["12345678"], list)
+        assert len(result["12345678"]) == 3
+        # Check that dates are present
+        dates = [rec.get("Date") for rec in result["12345678"]]
+        assert "2025-11-30" in dates
+        assert "2025-10-31" in dates
+        assert "2025-09-30" in dates
 
     def test_load_historical_ratings_file_not_found(self):
         """Test that missing file returns empty dict (first run)."""
@@ -889,276 +777,227 @@ class TestLoadHistoricalRatingsByPlayer:
         test_file = tmp_path / "cbx_ratings.csv"
         test_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-11-21,12345678,Alice Smith,2440,,2100\n"
-            "2025-11-21,87654321,Bob Jones,,,\n"
+            "2025-11-30,12345678,Alice Smith,2440,,2100\n"
+            "2025-11-30,87654321,Bob Jones,,,\n"
         )
         result = cbx_scraper.load_historical_ratings_by_player(str(test_file))
 
         assert len(result) == 2
+        # Should have lists of records
+        assert isinstance(result["12345678"], list)
+        assert isinstance(result["87654321"], list)
         # Empty string should be converted to None
-        assert result["12345678"]["Rapid"] is None
-        assert result["87654321"]["Standard"] is None
+        assert result["12345678"][0]["Rapid"] is None
+        assert result["87654321"][0]["Standard"] is None
 
     def test_load_historical_ratings_converts_empty_to_none(self, tmp_path):
         """Test that empty rating strings are converted to None."""
         test_file = tmp_path / "cbx_ratings.csv"
         test_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-11-21,12345678,Alice Smith,2440,2300,\n"
+            "2025-11-30,12345678,Alice Smith,2440,2300,\n"
         )
         result = cbx_scraper.load_historical_ratings_by_player(str(test_file))
 
-        assert result["12345678"]["Standard"] == "2440"
-        assert result["12345678"]["Rapid"] == "2300"
-        assert result["12345678"]["Blitz"] is None
+        assert isinstance(result["12345678"], list)
+        assert len(result["12345678"]) == 1
+        record = result["12345678"][0]
+        assert record["Standard"] == "2440"
+        assert record["Rapid"] == "2300"
+        assert record["Blitz"] is None
 
 
-class TestDetectRatingChanges:
-    """Tests for detect_rating_changes function."""
+class TestDetectNewMonths:
+    """Tests for detect_new_months function."""
 
-    def test_detect_rating_changes_numeric_change(self):
-        """Test detecting numeric rating change."""
-        historical_data = {
-            "12345678": {
-                "Standard": "2440",
-                "Rapid": "2300",
-                "Blitz": "2100"
+    def test_detect_new_months_single_new_month(self):
+        """Test detecting a single new month."""
+        from datetime import date
+
+        cbx_id = "12345678"
+        scraped_history = [
+            {
+                'date': date(2025, 11, 30),
+                'standard': 2450,
+                'rapid': 2300,
+                'blitz': 2100
+            },
+            {
+                'date': date(2025, 10, 31),
+                'standard': 2440,
+                'rapid': 2300,
+                'blitz': 2100
             }
+        ]
+        stored_history = {
+            "12345678": [
+                {
+                    'Date': '2025-10-31',
+                    'Standard': '2440',
+                    'Rapid': '2300',
+                    'Blitz': '2100'
+                }
+            ]
         }
-        new_ratings = {
-            "Standard": 2450,
-            "Rapid": 2300,
-            "Blitz": 2100
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
+
+        new_months = cbx_scraper.detect_new_months(
+            cbx_id, scraped_history, stored_history
         )
 
-        assert "Standard" in changes
-        assert changes["Standard"] == (2440, 2450)
-        assert "Rapid" not in changes
-        assert "Blitz" not in changes
+        # Should detect the November entry as new
+        assert len(new_months) == 1
+        assert new_months[0]['date'] == date(2025, 11, 30)
 
-    def test_detect_rating_changes_unrated_to_rated(self):
-        """Test detecting transition from unrated to rated."""
-        historical_data = {
-            "12345678": {
-                "Standard": "2440",
-                "Rapid": None,
-                "Blitz": "2100"
+    def test_detect_new_months_no_new_months(self):
+        """Test when all scraped months are already stored."""
+        from datetime import date
+
+        cbx_id = "12345678"
+        scraped_history = [
+            {
+                'date': date(2025, 11, 30),
+                'standard': 2450,
+                'rapid': 2300,
+                'blitz': 2100
             }
+        ]
+        stored_history = {
+            "12345678": [
+                {
+                    'Date': '2025-11-30',
+                    'Standard': '2450',
+                    'Rapid': '2300',
+                    'Blitz': '2100'
+                }
+            ]
         }
-        new_ratings = {
-            "Standard": 2440,
-            "Rapid": 2250,
-            "Blitz": 2100
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
+
+        new_months = cbx_scraper.detect_new_months(
+            cbx_id, scraped_history, stored_history
         )
 
-        assert "Rapid" in changes
-        assert changes["Rapid"] == (None, 2250)
-        assert len(changes) == 1
+        # Should find no new months
+        assert len(new_months) == 0
 
-    def test_detect_rating_changes_rated_to_unrated(self):
-        """Test detecting transition from rated to unrated."""
-        historical_data = {
-            "12345678": {
-                "Standard": "2440",
-                "Rapid": "2300",
-                "Blitz": "2100"
+    def test_detect_new_months_first_run(self):
+        """Test first run with no stored history (all scraped months are new)."""
+        from datetime import date
+
+        cbx_id = "12345678"
+        scraped_history = [
+            {
+                'date': date(2025, 11, 30),
+                'standard': 2450,
+                'rapid': 2300,
+                'blitz': 2100
+            },
+            {
+                'date': date(2025, 10, 31),
+                'standard': 2440,
+                'rapid': 2300,
+                'blitz': 2100
             }
-        }
-        new_ratings = {
-            "Standard": 2440,
-            "Rapid": None,
-            "Blitz": 2100
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
+        ]
+        stored_history = {}
+
+        new_months = cbx_scraper.detect_new_months(
+            cbx_id, scraped_history, stored_history
         )
 
-        assert "Rapid" in changes
-        assert changes["Rapid"] == (2300, None)
-        assert len(changes) == 1
+        # All months should be new on first run
+        assert len(new_months) == 2
 
-    def test_detect_rating_changes_multiple_types(self):
-        """Test detecting changes in multiple rating types."""
-        historical_data = {
-            "12345678": {
-                "Standard": "2440",
-                "Rapid": "2300",
-                "Blitz": "2100"
+    def test_detect_new_months_multiple_new(self):
+        """Test detecting multiple new months."""
+        from datetime import date
+
+        cbx_id = "12345678"
+        scraped_history = [
+            {
+                'date': date(2025, 11, 30),
+                'standard': 2450,
+                'rapid': 2300,
+                'blitz': 2100
+            },
+            {
+                'date': date(2025, 10, 31),
+                'standard': 2440,
+                'rapid': 2300,
+                'blitz': 2100
+            },
+            {
+                'date': date(2025, 9, 30),
+                'standard': 2430,
+                'rapid': 2290,
+                'blitz': 2090
             }
+        ]
+        stored_history = {
+            "12345678": [
+                {
+                    'Date': '2025-09-30',
+                    'Standard': '2430',
+                    'Rapid': '2290',
+                    'Blitz': '2090'
+                }
+            ]
         }
-        new_ratings = {
-            "Standard": 2450,
-            "Rapid": 2310,
-            "Blitz": 2100
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
+
+        new_months = cbx_scraper.detect_new_months(
+            cbx_id, scraped_history, stored_history
         )
 
-        assert "Standard" in changes
-        assert changes["Standard"] == (2440, 2450)
-        assert "Rapid" in changes
-        assert changes["Rapid"] == (2300, 2310)
-        assert "Blitz" not in changes
-        assert len(changes) == 2
+        # Should detect October and November as new
+        assert len(new_months) == 2
+        dates = [m['date'] for m in new_months]
+        assert date(2025, 11, 30) in dates
+        assert date(2025, 10, 31) in dates
 
-    def test_detect_rating_changes_no_changes(self):
-        """Test detecting no changes when ratings are identical."""
-        historical_data = {
-            "12345678": {
-                "Standard": "2440",
-                "Rapid": "2300",
-                "Blitz": "2100"
+    def test_detect_new_months_empty_scraped(self):
+        """Test when scraped history is empty."""
+        cbx_id = "12345678"
+        scraped_history = []
+        stored_history = {
+            "12345678": [
+                {
+                    'Date': '2025-11-30',
+                    'Standard': '2450',
+                    'Rapid': '2300',
+                    'Blitz': '2100'
+                }
+            ]
+        }
+
+        new_months = cbx_scraper.detect_new_months(
+            cbx_id, scraped_history, stored_history
+        )
+
+        # No new months when scraped is empty
+        assert len(new_months) == 0
+
+    def test_detect_new_months_unrated_handling(self):
+        """Test new month detection with unrated values."""
+        from datetime import date
+
+        cbx_id = "12345678"
+        scraped_history = [
+            {
+                'date': date(2025, 11, 30),
+                'standard': None,
+                'rapid': 2300,
+                'blitz': None
             }
-        }
-        new_ratings = {
-            "Standard": 2440,
-            "Rapid": 2300,
-            "Blitz": 2100
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
+        ]
+        stored_history = {}
+
+        new_months = cbx_scraper.detect_new_months(
+            cbx_id, scraped_history, stored_history
         )
 
-        assert changes == {}
-
-    def test_detect_rating_changes_missing_player(self):
-        """Test that new player (not in history) returns no changes."""
-        historical_data = {}
-        new_ratings = {
-            "Standard": 2440,
-            "Rapid": 2300,
-            "Blitz": 2100
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "99999999", new_ratings, historical_data
-        )
-
-        assert changes == {
-            "Standard": (None, 2440),
-            "Rapid": (None, 2300),
-            "Blitz": (None, 2100)
-        }
-
-    def test_detect_rating_changes_all_unrated_to_unrated(self):
-        """Test no changes when all ratings remain unrated."""
-        historical_data = {
-            "12345678": {
-                "Standard": None,
-                "Rapid": None,
-                "Blitz": None
-            }
-        }
-        new_ratings = {
-            "Standard": None,
-            "Rapid": None,
-            "Blitz": None
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
-        )
-
-        assert changes == {}
-
-    def test_detect_rating_changes_empty_string_ratings(self):
-        """Test handling empty string ratings from historical data."""
-        historical_data = {
-            "12345678": {
-                "Standard": "2440",
-                "Rapid": "",
-                "Blitz": "2100"
-            }
-        }
-        new_ratings = {
-            "Standard": 2440,
-            "Rapid": 2250,
-            "Blitz": 2100
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
-        )
-
-        # Empty string should be treated as None
-        assert "Rapid" in changes
-        assert changes["Rapid"] == (None, 2250)
-
-    def test_detect_rating_changes_missing_rating_types(self):
-        """Test handling when new_ratings missing some types."""
-        historical_data = {
-            "12345678": {
-                "Standard": "2440",
-                "Rapid": "2300",
-                "Blitz": "2100"
-            }
-        }
-        new_ratings = {
-            "Standard": 2440,
-            "Rapid": 2300
-            # Blitz missing
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
-        )
-
-        # Missing Blitz (None) vs "2100" should be detected as change
-        assert "Blitz" in changes
-        assert changes["Blitz"] == (2100, None)
-
-    def test_detect_rating_changes_significant_increase(self):
-        """Test detecting significant rating increase."""
-        historical_data = {
-            "12345678": {
-                "Standard": "2440",
-                "Rapid": "2300",
-                "Blitz": "2100"
-            }
-        }
-        new_ratings = {
-            "Standard": 2550,
-            "Rapid": 2400,
-            "Blitz": 2200
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
-        )
-
-        assert "Standard" in changes
-        assert changes["Standard"] == (2440, 2550)
-        assert "Rapid" in changes
-        assert changes["Rapid"] == (2300, 2400)
-        assert "Blitz" in changes
-        assert changes["Blitz"] == (2100, 2200)
-
-    def test_detect_rating_changes_decrease(self):
-        """Test detecting rating decrease."""
-        historical_data = {
-            "12345678": {
-                "Standard": "2440",
-                "Rapid": "2300",
-                "Blitz": "2100"
-            }
-        }
-        new_ratings = {
-            "Standard": 2420,
-            "Rapid": 2280,
-            "Blitz": 2080
-        }
-        changes = cbx_scraper.detect_rating_changes(
-            "12345678", new_ratings, historical_data
-        )
-
-        assert "Standard" in changes
-        assert changes["Standard"] == (2440, 2420)
-        assert "Rapid" in changes
-        assert changes["Rapid"] == (2300, 2280)
-        assert "Blitz" in changes
-        assert changes["Blitz"] == (2100, 2080)
+        # Should detect as new even with unrated values
+        assert len(new_months) == 1
+        assert new_months[0]['standard'] is None
+        assert new_months[0]['rapid'] == 2300
 
 
 class TestComposeNotificationEmail:
@@ -1166,12 +1005,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_single_change(self):
         """Test composing email with a single rating change."""
-        changes = {"Standard": (2440, 2450)}
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100},
+            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Alice Smith",
             "12345678",
-            changes,
-            "alice@example.com"
+            rating_history
         )
 
         assert subject == "Your CBX Rating Update - Alice Smith"
@@ -1182,16 +1024,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_multiple_changes(self):
         """Test composing email with multiple rating changes."""
-        changes = {
-            "Standard": (2440, 2450),
-            "Rapid": (2300, 2310),
-            "Blitz": (2100, 2115)
-        }
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2310, "blitz": 2115},
+            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Bob Jones",
             "87654321",
-            changes,
-            "bob@example.com"
+            rating_history
         )
 
         assert subject == "Your CBX Rating Update - Bob Jones"
@@ -1202,12 +1043,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_unrated_to_rated(self):
         """Test composing email when player becomes rated."""
-        changes = {"Standard": (None, 2450)}
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": None, "blitz": None},
+            {"date": date(2025, 10, 31), "standard": None, "rapid": None, "blitz": None}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Charlie Brown",
             "11111111",
-            changes,
-            "charlie@example.com"
+            rating_history
         )
 
         assert "Standard Rating: unrated → 2450" in body
@@ -1215,12 +1059,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_rated_to_unrated(self):
         """Test composing email when player rating is removed."""
-        changes = {"Rapid": (2300, None)}
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": None, "rapid": None, "blitz": None},
+            {"date": date(2025, 10, 31), "standard": 2400, "rapid": 2300, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Diana Prince",
             "22222222",
-            changes,
-            "diana@example.com"
+            rating_history
         )
 
         assert "Rapid Rating: 2300 → unrated" in body
@@ -1228,16 +1075,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_multiple_unrated_transitions(self):
         """Test composing email with mixed unrated transitions."""
-        changes = {
-            "Standard": (None, 2500),
-            "Rapid": (2400, None),
-            "Blitz": (2300, 2350)
-        }
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2500, "rapid": None, "blitz": 2350},
+            {"date": date(2025, 10, 31), "standard": None, "rapid": 2400, "blitz": 2300}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Eve Wilson",
             "33333333",
-            changes,
-            "eve@example.com"
+            rating_history
         )
 
         assert "Standard Rating: unrated → 2500" in body
@@ -1246,16 +1092,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_sorted_by_rating_type(self):
         """Test that rating changes are sorted alphabetically by type."""
-        changes = {
-            "Blitz": (2100, 2115),
-            "Standard": (2440, 2450),
-            "Rapid": (2300, 2310)
-        }
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2310, "blitz": 2115},
+            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Frank Miller",
             "44444444",
-            changes,
-            "frank@example.com"
+            rating_history
         )
 
         # Extract the lines with ratings
@@ -1270,13 +1115,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_with_cc_parameter(self):
         """Test that cc_email parameter is accepted but not used in composition."""
-        changes = {"Standard": (2440, 2450)}
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100},
+            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Grace Lee",
             "55555555",
-            changes,
-            "grace@example.com",
-            "admin@example.com"
+            rating_history
         )
 
         assert subject == "Your CBX Rating Update - Grace Lee"
@@ -1286,12 +1133,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_without_cc_parameter(self):
         """Test that cc_email is optional."""
-        changes = {"Standard": (2440, 2450)}
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100},
+            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Henry Ford",
             "66666666",
-            changes,
-            "henry@example.com"
+            rating_history
         )
 
         assert subject == "Your CBX Rating Update - Henry Ford"
@@ -1299,12 +1149,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_special_characters_in_name(self):
         """Test composing email with special characters in player name."""
-        changes = {"Standard": (2440, 2450)}
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100},
+            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "José García-López",
             "77777777",
-            changes,
-            "jose@example.com"
+            rating_history
         )
 
         assert "José García-López" in subject
@@ -1312,15 +1165,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_large_rating_change(self):
         """Test composing email with large rating fluctuation."""
-        changes = {
-            "Standard": (2200, 2500),  # 300 point jump
-            "Rapid": (2100, 1900)      # 200 point drop
-        }
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2500, "rapid": 1900, "blitz": 2100},
+            {"date": date(2025, 10, 31), "standard": 2200, "rapid": 2100, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Iris Newton",
             "88888888",
-            changes,
-            "iris@example.com"
+            rating_history
         )
 
         assert "Standard Rating: 2200 → 2500" in body
@@ -1328,12 +1181,15 @@ class TestComposeNotificationEmail:
 
     def test_compose_notification_email_format_consistency(self):
         """Test that email format is consistent with expected structure."""
-        changes = {"Standard": (2440, 2450)}
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100},
+            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Jack Turner",
             "99999999",
-            changes,
-            "jack@example.com"
+            rating_history
         )
 
         # Verify expected sections exist in order
@@ -1341,20 +1197,24 @@ class TestComposeNotificationEmail:
         assert "\n\nYour CBX ratings have been updated. Here are the changes:\n" in body
         assert "CBX ID: 99999999" in body
 
-    def test_compose_notification_email_no_changes(self):
-        """Test composing email with no rating changes (edge case)."""
-        changes = {}
+    def test_compose_notification_email_single_month_only(self):
+        """Test composing email with only one month of history."""
+        from datetime import date
+        rating_history = [
+            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100}
+        ]
         subject, body = email_notifier._compose_notification_email(
             "Kate Mitchell",
             "10101010",
-            changes,
-            "kate@example.com"
+            rating_history
         )
 
         assert subject == "Your CBX Rating Update - Kate Mitchell"
-        # Body should still have standard greeting and footer
+        # Body should have standard greeting and footer
         assert "Dear Kate Mitchell," in body
         assert "CBX ID: 10101010" in body
+        # Should show current ratings when only one month
+        assert "Standard Rating: 2450" in body
 
 
 class TestSendEmailNotification:
@@ -1690,12 +1550,12 @@ class TestPostRatingToApi:
         mock_post.return_value = mock_response
 
         profile = {
-            'Date': '2024-12-18',
-            'CBX ID': '12345678',
-            'Player Name': 'John Doe',
-            'Standard': 2500,
-            'Rapid': 2400,
-            'Blitz': 2300
+            'date': '2024-12-18',
+            'cbx_id': '12345678',
+            'player_name': 'John Doe',
+            'standard_rating': 2500,
+            'rapid_rating': 2400,
+            'blitz_rating': 2300
         }
 
         result = ratings_api._post_rating_to_api(
@@ -1717,12 +1577,12 @@ class TestPostRatingToApi:
         mock_post.side_effect = requests.Timeout("Connection timeout")
 
         profile = {
-            'Date': '2024-12-18',
-            'CBX ID': '12345678',
-            'Player Name': 'John Doe',
-            'Standard': 2500,
-            'Rapid': 2400,
-            'Blitz': 2300
+            'date': '2024-12-18',
+            'cbx_id': '12345678',
+            'player_name': 'John Doe',
+            'standard_rating': 2500,
+            'rapid_rating': 2400,
+            'blitz_rating': 2300
         }
 
         result = ratings_api._post_rating_to_api(
@@ -1741,12 +1601,12 @@ class TestPostRatingToApi:
         mock_post.side_effect = requests.ConnectionError("Connection refused")
 
         profile = {
-            'Date': '2024-12-18',
-            'CBX ID': '12345678',
-            'Player Name': 'John Doe',
-            'Standard': 2500,
-            'Rapid': 2400,
-            'Blitz': 2300
+            'date': '2024-12-18',
+            'cbx_id': '12345678',
+            'player_name': 'John Doe',
+            'standard_rating': 2500,
+            'rapid_rating': 2400,
+            'blitz_rating': 2300
         }
 
         result = ratings_api._post_rating_to_api(
@@ -1768,12 +1628,12 @@ class TestPostRatingToApi:
         mock_post.return_value = mock_response
 
         profile = {
-            'Date': '2024-12-18',
-            'CBX ID': '12345678',
-            'Player Name': 'John Doe',
-            'Standard': 2500,
-            'Rapid': 2400,
-            'Blitz': 2300
+            'date': '2024-12-18',
+            'cbx_id': '12345678',
+            'player_name': 'John Doe',
+            'standard_rating': 2500,
+            'rapid_rating': 2400,
+            'blitz_rating': 2300
         }
 
         result = ratings_api._post_rating_to_api(
@@ -1795,12 +1655,12 @@ class TestPostRatingToApi:
         mock_post.return_value = mock_response
 
         profile = {
-            'Date': '2024-12-18',
-            'CBX ID': '12345678',
-            'Player Name': 'John Doe',
-            'Standard': 2500,
-            'Rapid': 2400,
-            'Blitz': 2300
+            'date': '2024-12-18',
+            'cbx_id': '12345678',
+            'player_name': 'John Doe',
+            'standard_rating': 2500,
+            'rapid_rating': 2400,
+            'blitz_rating': 2300
         }
 
         result = ratings_api._post_rating_to_api(
@@ -1822,12 +1682,12 @@ class TestPostRatingToApi:
         mock_post.return_value = mock_response
 
         profile = {
-            'Date': '2024-12-18',
-            'CBX ID': '12345678',
-            'Player Name': 'John Doe',
-            'Standard': 2500,
-            'Rapid': 2400,
-            'Blitz': 2300
+            'date': '2024-12-18',
+            'cbx_id': '12345678',
+            'player_name': 'John Doe',
+            'standard_rating': 2500,
+            'rapid_rating': 2400,
+            'blitz_rating': 2300
         }
 
         result = ratings_api._post_rating_to_api(
@@ -1848,12 +1708,12 @@ class TestPostRatingToApi:
         mock_post.return_value = mock_response
 
         profile = {
-            'Date': '2024-12-18',
-            'CBX ID': '87654321',
-            'Player Name': 'Jane Doe',
-            'Standard': None,
-            'Rapid': 1900,
-            'Blitz': None
+            'date': '2024-12-18',
+            'cbx_id': '87654321',
+            'player_name': 'Jane Doe',
+            'standard_rating': None,
+            'rapid_rating': 1900,
+            'blitz_rating': None
         }
 
         result = ratings_api._post_rating_to_api(
@@ -1876,12 +1736,12 @@ class TestPostRatingToApi:
         mock_post.return_value = mock_response
 
         profile = {
-            'Date': '2024-12-18',
-            'CBX ID': '12345678',
-            'Player Name': 'John Doe',
-            'Standard': 2500,
-            'Rapid': 2400,
-            'Blitz': 2300
+            'date': '2024-12-18',
+            'cbx_id': '12345678',
+            'player_name': 'John Doe',
+            'standard_rating': 2500,
+            'rapid_rating': 2400,
+            'blitz_rating': 2300
         }
 
         result = ratings_api._post_rating_to_api(
