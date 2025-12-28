@@ -68,65 +68,6 @@ class TestEndToEndFlow:
 
 
 @pytest.mark.integration
-class TestEdgeCases:
-    """Integration tests for edge cases."""
-    
-    def test_unrated_player(self):
-        """Test handling of unrated players using CBX table structure."""
-        # Use the CBX table format for unrated case
-        html = """
-        <table id="ContentPlaceHolder1_gdvRating">
-            <tr>
-                <th>Mês/Ano</th>
-                <th>Clássico</th>
-                <th>Rápido</th>
-                <th>Blitz</th>
-            </tr>
-            <tr>
-                <td>12/2024</td>
-                <td></td>
-                <td></td>
-                <td></td>
-            </tr>
-        </table>
-        """
-        standard = cbx_scraper.extract_standard_rating(html)
-        rapid = cbx_scraper.extract_rapid_rating(html)
-        blitz = cbx_scraper.extract_blitz_rating(html)
-        # Should return None for unrated without raising exception
-        assert standard is None
-        assert rapid is None
-        assert blitz is None
-    
-    def test_missing_ratings(self):
-        """Test handling when one rating is missing using CBX table structure."""
-        # Test HTML with only standard rating using CBX table format
-        html = """
-        <table id="ContentPlaceHolder1_gdvRating">
-            <tr>
-                <th>Mês/Ano</th>
-                <th>Clássico</th>
-                <th>Rápido</th>
-                <th>Blitz</th>
-            </tr>
-            <tr>
-                <td>12/2024</td>
-                <td>2500</td>
-                <td></td>
-                <td></td>
-            </tr>
-        </table>
-        """
-        standard = cbx_scraper.extract_standard_rating(html)
-        rapid = cbx_scraper.extract_rapid_rating(html)
-        blitz = cbx_scraper.extract_blitz_rating(html)
-        # Standard should be found, rapid and blitz should be None
-        assert standard == 2500
-        assert rapid is None
-        assert blitz is None
-    
-
-@pytest.mark.integration
 class TestBatchProcessing:
     """Integration tests for batch processing functionality."""
     
@@ -1157,7 +1098,6 @@ class TestEdgeCases:
         with open(malformed_csv2, 'w') as f:
             f.write("CBX ID,email\n")
             f.write("abc,test@example.com\n")
-            f.write("123,invalid@example.com\n")  # Too short
             f.write("11111111,valid@example.com\n")  # Valid
 
         player_data = cbx_scraper.load_player_data_from_csv(str(malformed_csv2))
@@ -1262,7 +1202,6 @@ class TestEdgeCases:
         with open(invalid_ids_csv, 'w') as f:
             f.write("CBX ID,email\n")
             f.write("abc,test@example.com\n")  # Invalid: non-numeric
-            f.write("12,test2@example.com\n")  # Invalid: too short
             f.write("11111111,valid@example.com\n")  # Valid
 
         player_data = cbx_scraper.load_player_data_from_csv(str(invalid_ids_csv))

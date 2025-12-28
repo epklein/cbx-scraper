@@ -31,12 +31,6 @@ class TestCbxIdValidation:
         assert cbx_scraper.validate_cbx_id("1503abc") == False
         assert cbx_scraper.validate_cbx_id("") == False
     
-    def test_invalid_cbx_id_too_short(self):
-        """Test that CBX IDs shorter than 4 digits fail validation."""
-        assert cbx_scraper.validate_cbx_id("123") == False
-        assert cbx_scraper.validate_cbx_id("12") == False
-        assert cbx_scraper.validate_cbx_id("1") == False
-    
     def test_invalid_cbx_id_too_long(self):
         """Test that CBX IDs longer than 10 digits fail validation."""
         assert cbx_scraper.validate_cbx_id("12345678901") == False
@@ -269,12 +263,7 @@ class TestCSVGeneration:
                 'Rapid': 2780,
                 'Blitz': 2760,
                 'Rating History': [
-                    {
-                        'date': today,
-                        'standard': 2830,
-                        'rapid': 2780,
-                        'blitz': 2760
-                    }
+                    { 'date': today, 'standard': 2830, 'rapid': 2780, 'blitz': 2760 }
                 ]
             }
         ]
@@ -301,12 +290,7 @@ class TestCSVGeneration:
                 'Rapid': 2450,
                 'Blitz': 2400,
                 'Rating History': [
-                    {
-                        'date': today,
-                        'standard': 2500,
-                        'rapid': 2450,
-                        'blitz': 2400
-                    }
+                    { 'date': today, 'standard': 2500, 'rapid': 2450, 'blitz': 2400 }
                 ]
             }
         ]
@@ -330,12 +314,7 @@ class TestCSVGeneration:
                 'Rapid': None,
                 'Blitz': None,
                 'Rating History': [
-                    {
-                        'date': today,
-                        'standard': 2500,
-                        'rapid': None,
-                        'blitz': None
-                    }
+                    { 'date': today, 'standard': 2500, 'rapid': None, 'blitz': None }
                 ]
             }
         ]
@@ -376,12 +355,7 @@ class TestCSVGeneration:
                 'Rapid': 2780,
                 'Blitz': 2760,
                 'Rating History': [
-                    {
-                        'date': today,
-                        'standard': 2830,
-                        'rapid': 2780,
-                        'blitz': 2760
-                    }
+                    { 'date': today, 'standard': 2830, 'rapid': 2780, 'blitz': 2760 }
                 ]
             }
         ]
@@ -396,12 +370,7 @@ class TestCSVGeneration:
                 'Rapid': 2790,
                 'Blitz': 2770,
                 'Rating History': [
-                    {
-                        'date': today,
-                        'standard': 2840,
-                        'rapid': 2790,
-                        'blitz': 2770
-                    }
+                    { 'date': today, 'standard': 2840, 'rapid': 2790, 'blitz': 2770 }
                 ]
             }
         ]

@@ -41,7 +41,7 @@ def validate_cbx_id(cbx_id: str) -> bool:
 
     Rules:
         - Must be numeric
-        - Must be between 4-10 digits
+        - Must be between 1-10 digits
     """
     if not cbx_id or not isinstance(cbx_id, str):
         return False
@@ -49,7 +49,7 @@ def validate_cbx_id(cbx_id: str) -> bool:
     if not cbx_id.isdigit():
         return False
 
-    if len(cbx_id) < 4 or len(cbx_id) > 10:
+    if len(cbx_id) < 1 or len(cbx_id) > 10:
         return False
 
     return True

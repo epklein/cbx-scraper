@@ -184,7 +184,7 @@ CBX IDs can be found on:
 - Player profile pages
 - Tournament results
 
-CBX IDs are typically 6-8 digit numbers (4-10 digits valid).
+CBX IDs are typically 1-8 digit numbers (1-10 digits valid).
 
 ## Output Files
 
@@ -233,7 +233,7 @@ The scraper can automatically send email notifications to players when their rat
    27507,supi@example.com
    41921,neuris@example.com
    ```
-   - **CBX ID**: Player's CBX ID (4-10 digits)
+   - **CBX ID**: Player's CBX ID (1-10 digits)
    - **email**: Player's email address (optional - leave empty to opt out of notifications)
 
 2. **Configure environment variables** (in `.env`):

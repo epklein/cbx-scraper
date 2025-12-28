@@ -33,7 +33,6 @@ class TestValidateCbxId:
     def test_invalid_length(self):
         """Test that CBX IDs with invalid lengths fail."""
         invalid_ids = [
-            "123",        # 3 digits (too short)
             "12345678901",  # 11 digits (too long)
             "",           # empty string
         ]
@@ -138,7 +137,7 @@ class TestValidationIntegration:
     def test_validate_invalid_player(self):
         """Test validating a player with invalid data."""
         player_data = {
-            "cbx_id": "123",  # too short
+            "cbx_id": "12345678901",  # too long
             "email": "invalid-email",
         }
         assert validate_cbx_id(player_data["cbx_id"]) is False
