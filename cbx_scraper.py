@@ -586,7 +586,7 @@ def fetch_cbx_ids_from_api(api_endpoint: str, api_token: str) -> Optional[List[s
     Handles all errors gracefully - returns None if API is unavailable and logs details.
 
     Args:
-        api_endpoint: Full URL to API endpoint (e.g., https://eduklein.cloud/api/cbx-ids/)
+        api_endpoint: Full URL to API endpoint (e.g., https://chesshub.cloud/api/cbx-ids/)
         api_token: Authentication token for API (sent as Authorization: Token <token>)
 
     Returns:

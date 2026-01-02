@@ -842,7 +842,7 @@ class TestCbxIdsApiIntegration:
 
         # Test fetch
         result = cbx_scraper.fetch_cbx_ids_from_api(
-            "https://eduklein.cloud/api/cbx-ids/",
+            "https://chesshub.cloud/api/cbx-ids/",
             "test_token"
         )
 
@@ -870,7 +870,7 @@ class TestCbxIdsApiIntegration:
         mock_get.return_value = mock_response
 
         result = cbx_scraper.fetch_cbx_ids_from_api(
-            "https://eduklein.cloud/api/cbx-ids/",
+            "https://chesshub.cloud/api/cbx-ids/",
             "test_token"
         )
 
@@ -885,7 +885,7 @@ class TestCbxIdsApiIntegration:
         mock_get.return_value = mock_response
 
         result = cbx_scraper.fetch_cbx_ids_from_api(
-            "https://eduklein.cloud/api/cbx-ids/",
+            "https://chesshub.cloud/api/cbx-ids/",
             "invalid_token"
         )
 
@@ -898,7 +898,7 @@ class TestCbxIdsApiIntegration:
         mock_get.side_effect = requests.exceptions.Timeout()
 
         result = cbx_scraper.fetch_cbx_ids_from_api(
-            "https://eduklein.cloud/api/cbx-ids/",
+            "https://chesshub.cloud/api/cbx-ids/",
             "test_token"
         )
 
@@ -1004,7 +1004,7 @@ class TestCbxIdsApiIntegration:
 
         # Execute flow
         api_ids = cbx_scraper.fetch_cbx_ids_from_api(
-            "https://eduklein.cloud/api/cbx-ids/",
+            "https://chesshub.cloud/api/cbx-ids/",
             "test_token"
         )
         assert api_ids is not None
@@ -1039,7 +1039,7 @@ class TestCbxIdsApiIntegration:
 
         # API fetch should fail gracefully
         api_ids = cbx_scraper.fetch_cbx_ids_from_api(
-            "https://eduklein.cloud/api/cbx-ids/",
+            "https://chesshub.cloud/api/cbx-ids/",
             "test_token"
         )
         assert api_ids is None
@@ -1068,7 +1068,7 @@ class TestEdgeCases:
 
         # Test with empty token
         result = cbx_scraper.fetch_cbx_ids_from_api(
-            "https://eduklein.cloud/api/cbx-ids/", ""
+            "https://chesshub.cloud/api/cbx-ids/", ""
         )
         assert result is None
         assert not mock_get.called, "API should not be called with empty token"
@@ -1144,7 +1144,7 @@ class TestEdgeCases:
 
         # API fetch
         api_ids = cbx_scraper.fetch_cbx_ids_from_api(
-            "https://eduklein.cloud/api/cbx-ids/",
+            "https://chesshub.cloud/api/cbx-ids/",
             "test_token"
         )
         assert api_ids is not None
