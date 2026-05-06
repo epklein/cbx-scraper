@@ -20,9 +20,9 @@ services:
       # Mount data directory for players.csv input and cbx_ratings.csv output
       - /data/cbx-scraper:/data
     networks:
-      - cbx-network
+      - chess-wizard-network
     restart: "no"  # Disabled - use cron for scheduling instead
 
 networks:
-  cbx-network:
-    driver: bridge
+  chess-wizard-network:
+    external: true

@@ -183,19 +183,39 @@ Quick mode will:
 
 ### Step 3: View Results
 
-**Console Output**:
+All output goes through Python's `logging` module (to stderr). The default log level is `INFO`, which shows milestones and summaries. Set `LOG_LEVEL=DEBUG` to also see per-player detail and the ratings table.
+
+**Default output (`INFO`)**:
 ```
-Latest CBX Ratings:
+2026-05-05 10:00:01 - INFO - Execution mode: normal
+2026-05-05 10:00:01 - INFO - Current CSV contains 2 CBX IDs
+2026-05-05 10:00:01 - INFO - [NORMAL] Processing 2 players
+2026-05-05 10:00:03 - INFO - Sending email notifications...
+2026-05-05 10:00:03 - INFO - Posting rating updates to external API...
+2026-05-05 10:00:03 - INFO - Summary: processed 2 IDs successfully, 0 errors
+2026-05-05 10:00:03 - INFO - Output written to: cbx_ratings.csv
+2026-05-05 10:00:03 - INFO - Email notifications: 1 sent, 0 failed
+2026-05-05 10:00:03 - INFO - API updates: 5 posted, 0 failed
+```
 
-Date         CBX ID       Player Name            Standard  Rapid  Blitz
------------------------------------------------------------------------
-2025-06-30   27507        Luis Paulo Supi        2556      2317   1991
-2025-11-31   41921        Neuris Delgado Ramirez 2572      2423   2660
+**Verbose output (`LOG_LEVEL=DEBUG`)**:
+```
+2026-05-05 10:00:01 - INFO - Execution mode: normal
+...
+2026-05-05 10:00:03 - DEBUG - Latest CBX Ratings:
+Date         CBX ID       Player Name                              Standard  Rapid  Blitz
+-----------------------------------------------------------------------------------------
+2025-06-30   27507        Luis Paulo Supi                          2556      2317   1991
+2025-11-30   41921        Neuris Delgado Ramirez                   2572      2423   2660
 
-Processed 2 IDs successfully, 0 errors
-Output written to: cbx_ratings.csv
-Email notifications: 1 sent, 0 failed
-API updates: 5 posted, 0 failed
+2026-05-05 10:00:03 - DEBUG - Email sent to Luis Paulo Supi (supi@example.com)
+2026-05-05 10:00:03 - DEBUG - API updates posted for Luis Paulo Supi (27507) - 1 months
+...
+```
+
+Run locally with debug output:
+```bash
+LOG_LEVEL=DEBUG python cbx_scraper.py
 ```
 
 **CSV Output File**:
@@ -307,7 +327,7 @@ If player with CBX ID 12345678 has rating change from 2440 → 2450 (Standard ra
 
 **Body**:
 ```
-Dear Alice,
+Dear Alice Smith,
 
 Your CBX ratings have been updated:
 
@@ -323,6 +343,9 @@ Last Updated: 2025-11-23
 ### Environment Variables
 
 The script uses environment variables to configure input, output, and email settings:
+
+#### Logging
+- **`LOG_LEVEL`**: Logging verbosity (default: `INFO`). Set to `DEBUG` to see per-player detail and the ratings table. Valid values: `DEBUG`, `INFO`, `WARNING`, `ERROR`.
 
 #### Input/Output Files
 - **`CBX_PLAYERS_FILE`**: Path to unified player data file with emails (default: `players.csv`)

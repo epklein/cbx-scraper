@@ -25,7 +25,7 @@ load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO').upper(), logging.INFO),
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -1223,24 +1223,33 @@ Configuration:
 
     # Batch processing mode
     try:
+        start_time = datetime.now()
+        logger.info(f"CBX scraper started - mode: {execution_mode.upper()}, time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
         # Load player data from CSV file (includes CBX IDs and emails)
+        logger.info(f"Loading player data from {CBX_PLAYERS_FILE}")
+        t0 = datetime.now()
         try:
             player_data = load_player_data_from_csv(CBX_PLAYERS_FILE)
         except FileNotFoundError:
             # File doesn't exist yet; will be created if API adds IDs
             player_data = {}
+        logger.info(f"Player data loaded: {len(player_data)} entries ({(datetime.now() - t0).total_seconds():.1f}s)")
 
         # Get API configuration
         api_endpoint = os.getenv('CBX_IDS_API_ENDPOINT', '').strip()
         api_token = os.getenv('API_TOKEN', '').strip()
 
         # Select CBX IDs based on execution mode
+        logger.info("Selecting CBX IDs for processing")
+        t0 = datetime.now()
         cbx_ids, new_ids = select_cbx_ids_for_processing(
             execution_mode,
             api_endpoint,
             api_token,
             player_data
         )
+        logger.info(f"CBX ID selection done: {len(cbx_ids)} selected, {len(new_ids)} new ({(datetime.now() - t0).total_seconds():.1f}s)")
 
         # Augment players file with new IDs if any were discovered
         if new_ids:
@@ -1262,38 +1271,47 @@ Configuration:
                 logger.error("Player data file is empty or contains no valid players")
                 sys.exit(2)
 
-        logger.info(f"[{execution_mode.upper()}] Processing {len(cbx_ids)} players")
+        logger.info(f"[{execution_mode.upper()}] Scraping CBX ratings for {len(cbx_ids)} players")
 
         # Process batch to fetch ratings
+        t0 = datetime.now()
         results, errors = process_batch(cbx_ids)
+        logger.info(f"CBX scraping done: {len(results)} succeeded, {len(errors)} errors ({(datetime.now() - t0).total_seconds():.1f}s)")
 
         # Write CSV output
+        logger.info(f"Writing results to {OUTPUT_FILENAME}")
+        t0 = datetime.now()
         write_csv_output(OUTPUT_FILENAME, results)
-
+        logger.info(f"CSV output written ({(datetime.now() - t0).total_seconds():.1f}s)")
 
         # Send email notifications for players with rating changes
         logger.info("Sending email notifications...")
+        t0 = datetime.now()
         email_sent, email_failed = send_batch_notifications(results, player_data)
+        logger.info(f"Email notifications done: {email_sent} sent, {email_failed} failed ({(datetime.now() - t0).total_seconds():.1f}s)")
 
         # Post ratings updates to external API if configured
         logger.info("Posting rating updates to external API...")
+        t0 = datetime.now()
         api_posted, api_failed = send_batch_api_updates(results)
+        logger.info(f"API updates done: {api_posted} posted, {api_failed} failed ({(datetime.now() - t0).total_seconds():.1f}s)")
 
         # Display console output
         console_output = format_console_output(results)
 
-        print("Latest CBX Ratings: ")
-        print(console_output)
+        logger.debug("Latest CBX Ratings: \n" + console_output)
 
         # Log summary
         success_count = len(results)
         error_count = len(errors)
 
-        print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Summary:")
-        print(f"- Processed {success_count} IDs successfully, {error_count} errors")
-        print(f"- Output written to: {OUTPUT_FILENAME}")
-        print(f"- Email notifications: {email_sent} sent, {email_failed} failed")
-        print(f"- API updates: {api_posted} posted, {api_failed} failed")
+        elapsed = (datetime.now() - start_time).total_seconds()
+
+        logger.info(
+            f"Run complete in {elapsed:.1f}s — "
+            f"{success_count} players OK, {error_count} errors, "
+            f"{email_sent} emails sent, {api_posted} API updates posted"
+        )
 
 
         # Exit code: 0 if at least one success, 1 if all failed
@@ -1303,16 +1321,16 @@ Configuration:
             sys.exit(1)
 
     except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}")
         sys.exit(2)
     except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}")
         sys.exit(2)
     except PermissionError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}")
         sys.exit(2)
     except Exception as e:
-        print(f"Error: Unexpected error occurred: {e}", file=sys.stderr)
+        logger.error(f"Unexpected error occurred: {e}")
         sys.exit(1)
 
 
