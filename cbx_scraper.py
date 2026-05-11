@@ -26,7 +26,8 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(
     level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO').upper(), logging.INFO),
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
 )
 logger = logging.getLogger(__name__)
 
@@ -1276,7 +1277,7 @@ Configuration:
         # Process batch to fetch ratings
         t0 = datetime.now()
         results, errors = process_batch(cbx_ids)
-        logger.info(f"CBX scraping done: {len(results)} succeeded, {len(errors)} errors ({(datetime.now() - t0).total_seconds():.1f}s)")
+        logger.info(f"CBX scraping done: {len(results)} succeeded, {len(errors)} failed ({(datetime.now() - t0).total_seconds():.1f}s)")
 
         # Write CSV output
         logger.info(f"Writing results to {OUTPUT_FILENAME}")
@@ -1309,7 +1310,7 @@ Configuration:
 
         logger.info(
             f"Run complete in {elapsed:.1f}s — "
-            f"{success_count} players OK, {error_count} errors, "
+            f"{success_count} players OK, {error_count} failed, "
             f"{email_sent} emails sent, {api_posted} API updates posted"
         )
 
