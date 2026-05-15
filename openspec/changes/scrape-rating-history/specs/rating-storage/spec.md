@@ -50,8 +50,8 @@ Then the columns should be: `Date,CBX ID,Player Name,Standard,Rapid,Blitz` (unch
 Given a player with records for November 2025 and October 2025
 When written to CSV
 Then the Date column should contain values like:
-  - `2025-11-30` (last day of November)
-  - `2025-10-31` (last day of October)
+  - `2025-11-01` (first day of November)
+  - `2025-10-01` (first day of October)
 
 ---
 
@@ -77,7 +77,7 @@ And May should be updated with new values
 ## Implementation Notes
 
 - Use ISO 8601 date format for month values (YYYY-MM-DD)
-- Calculate last day of month using `calendar.monthrange()` or equivalent
+- Date column uses the first day of the month (e.g., 2025-11-01), since CBX creates rating records at the beginning of the month
 - Read entire CSV on write, filter out matching months, append updated months (for simplicity)
 - Preserve month order in CSV (optional - can be any order, or can sort by month)
 - Empty string represents unrated/missing values in rating columns (backward compatible)

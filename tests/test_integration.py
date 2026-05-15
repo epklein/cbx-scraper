@@ -150,8 +150,8 @@ class TestEmailNotificationIntegration:
 
         # Create sample rating history
         rating_history = [
-            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2310, "blitz": 2100},
-            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+            {"date": date(2025, 11, 1), "standard": 2450, "rapid": 2310, "blitz": 2100},
+            {"date": date(2025, 10, 1), "standard": 2440, "rapid": 2300, "blitz": 2100}
         ]
 
         # Compose email
@@ -177,8 +177,8 @@ class TestEmailNotificationIntegration:
 
         # Compose email
         rating_history = [
-            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100},
-            {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+            {"date": date(2025, 11, 1), "standard": 2450, "rapid": 2300, "blitz": 2100},
+            {"date": date(2025, 10, 1), "standard": 2440, "rapid": 2300, "blitz": 2100}
         ]
         subject, body = email_notifier._compose_notification_email(
             "Alice Smith",
@@ -209,8 +209,8 @@ class TestEmailNotificationIntegration:
         history_file = tmp_path / "history.csv"
         history_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-10-31,12345678,Alice Smith,2440,2300,2100\n"
-            "2025-10-31,87654321,Bob Jones,2500,2400,\n"
+            "2025-10-01,12345678,Alice Smith,2440,2300,2100\n"
+            "2025-10-01,87654321,Bob Jones,2500,2400,\n"
         )
 
         # Load player data
@@ -224,7 +224,7 @@ class TestEmailNotificationIntegration:
 
         # Detect new months for Alice (new month with different rating)
         alice_scraped_history = [
-            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100}
+            {"date": date(2025, 11, 1), "standard": 2450, "rapid": 2300, "blitz": 2100}
         ]
         alice_new_months = cbx_scraper.detect_new_months(
             "12345678",
@@ -232,7 +232,7 @@ class TestEmailNotificationIntegration:
             historical_data
         )
         assert len(alice_new_months) == 1
-        assert alice_new_months[0]["date"] == date(2025, 11, 30)
+        assert alice_new_months[0]["date"] == date(2025, 11, 1)
         assert alice_new_months[0]["standard"] == 2450
 
         # Verify email notification would be sent for Alice (has new month)
@@ -241,7 +241,7 @@ class TestEmailNotificationIntegration:
 
         # Detect new months for Bob (same month, no new months)
         bob_scraped_history = [
-            {"date": date(2025, 10, 31), "standard": 2500, "rapid": 2400, "blitz": None}
+            {"date": date(2025, 10, 1), "standard": 2500, "rapid": 2400, "blitz": None}
         ]
         bob_new_months = cbx_scraper.detect_new_months(
             "87654321",
@@ -295,8 +295,8 @@ class TestEmailNotificationIntegration:
         history_file = tmp_path / "history.csv"
         history_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-10-31,12345678,Alice Smith,2440,2300,2100\n"
-            "2025-10-31,87654321,Bob Jones,2500,2400,\n"
+            "2025-10-01,12345678,Alice Smith,2440,2300,2100\n"
+            "2025-10-01,87654321,Bob Jones,2500,2400,\n"
         )
 
         # Load player data
@@ -307,7 +307,7 @@ class TestEmailNotificationIntegration:
 
         # Simulate scraped history with new month for Alice
         alice_scraped_history = [
-            {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100}
+            {"date": date(2025, 11, 1), "standard": 2450, "rapid": 2300, "blitz": 2100}
         ]
 
         # Detect new months
@@ -366,10 +366,10 @@ class TestFullEmailNotificationPipeline:
         # Create historical ratings (baseline data - October)
         history_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-10-31,12345678,Alice Smith,2440,2300,2100\n"
-            "2025-10-31,87654321,Bob Jones,2500,2400,2200\n"
-            "2025-10-31,11111111,Charlie Brown,2340,2240,2140\n"
-            "2025-10-31,22222222,Diana Prince,2600,2550,2500\n"
+            "2025-10-01,12345678,Alice Smith,2440,2300,2100\n"
+            "2025-10-01,87654321,Bob Jones,2500,2400,2200\n"
+            "2025-10-01,11111111,Charlie Brown,2340,2240,2140\n"
+            "2025-10-01,22222222,Diana Prince,2600,2550,2500\n"
         )
 
         # Step 1: Load player data
@@ -388,10 +388,10 @@ class TestFullEmailNotificationPipeline:
 
         # Step 3: Simulate scraped history (some with new months, some without)
         scraped_histories = {
-            "12345678": [{"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100}],  # New month
-            "87654321": [{"date": date(2025, 11, 30), "standard": 2500, "rapid": 2410, "blitz": 2200}],  # New month
-            "11111111": [{"date": date(2025, 10, 31), "standard": 2340, "rapid": 2240, "blitz": 2140}],  # Same month
-            "22222222": [{"date": date(2025, 10, 31), "standard": 2600, "rapid": 2550, "blitz": 2500}],  # Same month
+            "12345678": [{"date": date(2025, 11, 1), "standard": 2450, "rapid": 2300, "blitz": 2100}],  # New month
+            "87654321": [{"date": date(2025, 11, 1), "standard": 2500, "rapid": 2410, "blitz": 2200}],  # New month
+            "11111111": [{"date": date(2025, 10, 1), "standard": 2340, "rapid": 2240, "blitz": 2140}],  # Same month
+            "22222222": [{"date": date(2025, 10, 1), "standard": 2600, "rapid": 2550, "blitz": 2500}],  # Same month
         }
 
         # Step 4: Detect new months for each player
@@ -477,7 +477,7 @@ class TestFullEmailNotificationPipeline:
         assert len(historical_data) == 0
 
         # Simulate scraped history (first run - all months are new)
-        scraped_history = [{"date": date(2025, 11, 30), "standard": 2400, "rapid": 2300, "blitz": 2100}]
+        scraped_history = [{"date": date(2025, 11, 1), "standard": 2400, "rapid": 2300, "blitz": 2100}]
 
         # Detect new months (all months should be new on first run)
         new_months = cbx_scraper.detect_new_months(
@@ -486,7 +486,7 @@ class TestFullEmailNotificationPipeline:
 
         # All months should be detected as new (first run)
         assert len(new_months) == 1
-        assert new_months[0]["date"] == date(2025, 11, 30)
+        assert new_months[0]["date"] == date(2025, 11, 1)
         assert new_months[0]["standard"] == 2400
 
         # Emails SHOULD be sent on first run (new months detected)
@@ -516,7 +516,7 @@ class TestFullEmailNotificationPipeline:
 
         history_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-10-31,12345678,Alice Smith,2440,2300,2100\n"
+            "2025-10-01,12345678,Alice Smith,2440,2300,2100\n"
         )
 
         # Load data
@@ -524,7 +524,7 @@ class TestFullEmailNotificationPipeline:
         historical_data = cbx_scraper.load_historical_ratings_by_player(str(history_file))
 
         # Simulate scraped history with new month showing large rating changes
-        scraped_history = [{"date": date(2025, 11, 30), "standard": 2500, "rapid": 2400, "blitz": 2250}]
+        scraped_history = [{"date": date(2025, 11, 1), "standard": 2500, "rapid": 2400, "blitz": 2250}]
 
         # Detect new months
         new_months = cbx_scraper.detect_new_months(
@@ -533,7 +533,7 @@ class TestFullEmailNotificationPipeline:
 
         # Should detect one new month
         assert len(new_months) == 1
-        assert new_months[0]["date"] == date(2025, 11, 30)
+        assert new_months[0]["date"] == date(2025, 11, 1)
         assert new_months[0]["standard"] == 2500
         assert new_months[0]["rapid"] == 2400
         assert new_months[0]["blitz"] == 2250
@@ -568,7 +568,7 @@ class TestFullEmailNotificationPipeline:
 
         history_file.write_text(
             "Date,CBX ID,Player Name,Standard,Rapid,Blitz\n"
-            "2025-10-31,12345678,Alice Smith,,,\n"
+            "2025-10-01,12345678,Alice Smith,,,\n"
         )
 
         # Load data
@@ -576,7 +576,7 @@ class TestFullEmailNotificationPipeline:
         historical_data = cbx_scraper.load_historical_ratings_by_player(str(history_file))
 
         # Player now has ratings in a new month
-        scraped_history = [{"date": date(2025, 11, 30), "standard": 2400, "rapid": 2300, "blitz": 2100}]
+        scraped_history = [{"date": date(2025, 11, 1), "standard": 2400, "rapid": 2300, "blitz": 2100}]
 
         # Detect new months
         new_months = cbx_scraper.detect_new_months(
@@ -585,7 +585,7 @@ class TestFullEmailNotificationPipeline:
 
         # Should detect the new month with ratings
         assert len(new_months) == 1
-        assert new_months[0]["date"] == date(2025, 11, 30)
+        assert new_months[0]["date"] == date(2025, 11, 1)
         assert new_months[0]["standard"] == 2400
         assert new_months[0]["rapid"] == 2300
         assert new_months[0]["blitz"] == 2100
@@ -631,10 +631,10 @@ class TestSendBatchNotifications:
                 "Rapid": 2300,
                 "Blitz": 2100,
                 "Rating History": [
-                    {"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100},
-                    {"date": date(2025, 10, 31), "standard": 2440, "rapid": 2300, "blitz": 2100}
+                    {"date": date(2025, 11, 1), "standard": 2450, "rapid": 2300, "blitz": 2100},
+                    {"date": date(2025, 10, 1), "standard": 2440, "rapid": 2300, "blitz": 2100}
                 ],
-                "New Months": [{"date": date(2025, 11, 30), "standard": 2450, "rapid": 2300, "blitz": 2100}]  # Has new month
+                "New Months": [{"date": date(2025, 11, 1), "standard": 2450, "rapid": 2300, "blitz": 2100}]  # Has new month
             },
             {
                 "CBX ID": "87654321",
@@ -643,7 +643,7 @@ class TestSendBatchNotifications:
                 "Rapid": 2400,
                 "Blitz": 2200,
                 "Rating History": [
-                    {"date": date(2025, 11, 30), "standard": 2500, "rapid": 2400, "blitz": 2200}
+                    {"date": date(2025, 11, 1), "standard": 2500, "rapid": 2400, "blitz": 2200}
                 ],
                 "New Months": []  # No new months
             },
@@ -654,9 +654,9 @@ class TestSendBatchNotifications:
                 "Rapid": 2240,
                 "Blitz": 2140,
                 "Rating History": [
-                    {"date": date(2025, 11, 30), "standard": 2340, "rapid": 2240, "blitz": 2140}
+                    {"date": date(2025, 11, 1), "standard": 2340, "rapid": 2240, "blitz": 2140}
                 ],
-                "New Months": [{"date": date(2025, 11, 30), "standard": 2340, "rapid": 2240, "blitz": 2140}]  # Has new month but no email
+                "New Months": [{"date": date(2025, 11, 1), "standard": 2340, "rapid": 2240, "blitz": 2140}]  # Has new month but no email
             }
         ]
 
@@ -690,20 +690,20 @@ class TestSendBatchNotifications:
                 "Player Name": "Alice Smith",
                 "Standard": 2450,
                 "Rating History": [
-                    {"date": date(2025, 11, 30), "standard": 2450, "rapid": None, "blitz": None},
-                    {"date": date(2025, 10, 31), "standard": 2440, "rapid": None, "blitz": None}
+                    {"date": date(2025, 11, 1), "standard": 2450, "rapid": None, "blitz": None},
+                    {"date": date(2025, 10, 1), "standard": 2440, "rapid": None, "blitz": None}
                 ],
-                "New Months": [{"date": date(2025, 11, 30), "standard": 2450, "rapid": None, "blitz": None}]
+                "New Months": [{"date": date(2025, 11, 1), "standard": 2450, "rapid": None, "blitz": None}]
             },
             {
                 "CBX ID": "87654321",
                 "Player Name": "Bob Jones",
                 "Standard": 2510,
                 "Rating History": [
-                    {"date": date(2025, 11, 30), "standard": 2510, "rapid": None, "blitz": None},
-                    {"date": date(2025, 10, 31), "standard": 2500, "rapid": None, "blitz": None}
+                    {"date": date(2025, 11, 1), "standard": 2510, "rapid": None, "blitz": None},
+                    {"date": date(2025, 10, 1), "standard": 2500, "rapid": None, "blitz": None}
                 ],
-                "New Months": [{"date": date(2025, 11, 30), "standard": 2510, "rapid": None, "blitz": None}]
+                "New Months": [{"date": date(2025, 11, 1), "standard": 2510, "rapid": None, "blitz": None}]
             },
         ]
 
@@ -735,7 +735,7 @@ class TestSendBatchNotifications:
                 "Player Name": "Alice Smith",
                 "Standard": 2440,
                 "Rating History": [
-                    {"date": date(2025, 11, 30), "standard": 2440, "rapid": None, "blitz": None}
+                    {"date": date(2025, 11, 1), "standard": 2440, "rapid": None, "blitz": None}
                 ],
                 "New Months": []  # No new months
             },
@@ -744,7 +744,7 @@ class TestSendBatchNotifications:
                 "Player Name": "Bob Jones",
                 "Standard": 2500,
                 "Rating History": [
-                    {"date": date(2025, 11, 30), "standard": 2500, "rapid": None, "blitz": None}
+                    {"date": date(2025, 11, 1), "standard": 2500, "rapid": None, "blitz": None}
                 ],
                 "New Months": []  # No new months
             },
@@ -780,20 +780,20 @@ class TestSendBatchNotifications:
                 "Player Name": "Alice Smith",
                 "Standard": 2450,
                 "Rating History": [
-                    {"date": date(2025, 11, 30), "standard": 2450, "rapid": None, "blitz": None},
-                    {"date": date(2025, 10, 31), "standard": 2440, "rapid": None, "blitz": None}
+                    {"date": date(2025, 11, 1), "standard": 2450, "rapid": None, "blitz": None},
+                    {"date": date(2025, 10, 1), "standard": 2440, "rapid": None, "blitz": None}
                 ],
-                "New Months": [{"date": date(2025, 11, 30), "standard": 2450, "rapid": None, "blitz": None}]
+                "New Months": [{"date": date(2025, 11, 1), "standard": 2450, "rapid": None, "blitz": None}]
             },
             {
                 "CBX ID": "87654321",
                 "Player Name": "Bob Jones",
                 "Standard": 2510,
                 "Rating History": [
-                    {"date": date(2025, 11, 30), "standard": 2510, "rapid": None, "blitz": None},
-                    {"date": date(2025, 10, 31), "standard": 2500, "rapid": None, "blitz": None}
+                    {"date": date(2025, 11, 1), "standard": 2510, "rapid": None, "blitz": None},
+                    {"date": date(2025, 10, 1), "standard": 2500, "rapid": None, "blitz": None}
                 ],
-                "New Months": [{"date": date(2025, 11, 30), "standard": 2510, "rapid": None, "blitz": None}]
+                "New Months": [{"date": date(2025, 11, 1), "standard": 2510, "rapid": None, "blitz": None}]
             },
         ]
 

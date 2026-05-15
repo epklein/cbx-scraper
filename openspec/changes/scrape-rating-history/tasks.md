@@ -13,20 +13,16 @@
   - Parse Portuguese month abbreviations: Jan, Fev, Mar, Abr, Mai, Jun, Jul, Ago, Set, Out, Nov, Dez
   - Return month number (1-12) or raise ValueError for invalid months
   - Add docstring with test examples
-- [ ] Create `_calculate_month_end_date(year: int, month: int) -> date` function
-  - Use `calendar.monthrange()` to find last day of month
-  - Return date object for last day of month
-  - Handle leap years correctly
+- [x] First day of month calculated inline as `date(year, month, 1)` — no helper needed
 - [ ] Add unit tests for month parsing
   - Test all 12 Portuguese months
-  - Test edge cases (February leap/non-leap years)
   - Test invalid month names
 
 **Acceptance Criteria:**
 - `_parse_portuguese_month("Nov")` returns 11
 - `_parse_portuguese_month("Fev")` returns 2
-- `_calculate_month_end_date(2025, 11)` returns date(2025, 11, 30)
-- `_calculate_month_end_date(2024, 2)` returns date(2024, 2, 29) (leap year)
+- `_calculate_month_start_date(2025, 11)` returns date(2025, 11, 1)
+- `_calculate_month_start_date(2024, 2)` returns date(2024, 2, 1)
 
 ---
 
@@ -34,17 +30,17 @@
 - [ ] Create `_parse_month_year_string(month_year_str: str) -> Optional[date]` function
   - Input: "Nov/2025" or "Out/2025"
   - Parse month and year from string
-  - Return date of last day of month using utilities from Task 1.1
+  - Return date of first day of month
   - Return None on invalid format
-  - Add docstring with examples (e.g., "Nov/2025" -> date(2025, 11, 30))
+  - Add docstring with examples (e.g., "Nov/2025" -> date(2025, 11, 1))
 - [ ] Add unit tests
   - Test valid Portuguese month/year combinations
   - Test invalid formats (typos, reversed order, etc.)
   - Test all month abbreviations with sample year
 
 **Acceptance Criteria:**
-- `_parse_month_year_string("Nov/2025")` returns date(2025, 11, 30)
-- `_parse_month_year_string("Out/2025")` returns date(2025, 10, 31)
+- `_parse_month_year_string("Nov/2025")` returns date(2025, 11, 1)
+- `_parse_month_year_string("Out/2025")` returns date(2025, 10, 1)
 - `_parse_month_year_string("Invalid/2025")` returns None
 - `_parse_month_year_string("")` returns None
 
@@ -141,7 +137,7 @@
   - For each player in results, iterate over rating_history list
   - Write one row per month (not one row per day)
   - When same (CBX ID, Month) exists, replace it (read/filter/write pattern)
-  - Month values should be ISO 8601 strings (e.g., "2025-11-30")
+  - Month values should be ISO 8601 strings using the first day of the month (e.g., "2025-11-01")
 - [ ] Handle CSV file format migration
   - If old "Date" column exists, consider it a breaking change
   - Option: Delete old file or fail with clear error

@@ -24,14 +24,14 @@ def _extract_all_rating_history_from_cbx_table(html: str) -> List[Dict]:
 
 ### 2. Month-to-Date Mapping
 
-Parse Portuguese month names and map to the last day of the month:
+Parse Portuguese month names and map to the first day of the month (CBX creates rating records at the beginning of the month):
 
 ```python
 def _parse_month_year_to_date(month_year_str: str) -> Optional[date]:
     """
-    Parse "Nov/2025" or "Out/2025" (Portuguese month) to date of last day of month.
-    Nov/2025 -> 2025-11-30
-    Out/2025 (October) -> 2025-10-31
+    Parse "Nov/2025" or "Out/2025" (Portuguese month) to date of first day of month.
+    Nov/2025 -> 2025-11-01
+    Out/2025 (October) -> 2025-10-01
     """
 ```
 
@@ -60,13 +60,13 @@ Date,CBX ID,Player Name,Standard,Rapid,Blitz
 **New format (monthly, one record per month-year per player - same column name, different date values):**
 ```
 Date,CBX ID,Player Name,Standard,Rapid,Blitz
-2025-11-30,94157,Eduardo Pavinato Klein,1800,1884,1800
-2025-10-31,94157,Eduardo Pavinato Klein,1800,1914,1800
-2025-09-30,94157,Eduardo Pavinato Klein,1800,1924,1800
+2025-11-01,94157,Eduardo Pavinato Klein,1800,1884,1800
+2025-10-01,94157,Eduardo Pavinato Klein,1800,1914,1800
+2025-09-01,94157,Eduardo Pavinato Klein,1800,1924,1800
 ```
 
 **Storage behavior:**
-- "Date" column now contains the last day of the month instead of the current date
+- "Date" column now contains the first day of the month (CBX creates rating records at the beginning of the month)
 - Replace existing row if month-year already exists (UPDATE semantics)
 - Append new rows for new month-years (INSERT semantics)
 - Preserve old records if a month disappears from the table
@@ -83,8 +83,8 @@ def load_historical_ratings_by_player_monthly(filepath: str) -> Dict[str, List[D
     """
     Returns: {
         cbx_id: [
-            {"Month": "2025-11-30", "Standard": 1800, "Rapid": 1884, ...},
-            {"Month": "2025-10-31", "Standard": 1800, "Rapid": 1914, ...},
+            {"Month": "2025-11-01", "Standard": 1800, "Rapid": 1884, ...},
+            {"Month": "2025-10-01", "Standard": 1800, "Rapid": 1914, ...},
             ...
         ]
     }
@@ -109,7 +109,7 @@ def detect_new_months(
 
     Example return:
     [
-        {"month": "2025-11-30", "standard": 1800, "rapid": 1884, "blitz": 1800}
+        {"month": "2025-11-01", "standard": 1800, "rapid": 1884, "blitz": 1800}
     ]
     """
 ```

@@ -45,8 +45,9 @@ CBX Scraper is a Python-based batch processing tool that automatically retrieves
 - **Configuration Management**: 12-factor app pattern using environment variables (`.env` files)
 - **CSV Data Format**:
   - Input: Player ID, Name, Email (from `players.csv`)
-  - Output: CBX ID, Date, Standard Rating, Rapid Rating, Blitz Rating, Last Scraped (from `cbx_ratings.csv`)
-  - Deduplication: Same-day runs replace existing records; multi-day history maintained
+  - Output: CBX ID, Date, Standard Rating, Rapid Rating, Blitz Rating (from `cbx_ratings.csv`)
+  - Date field: First day of the month (e.g., 2025-11-01 for November 2025), since CBX records are created at the beginning of the month
+  - Deduplication: Same-month runs replace existing records for that month; multi-month history maintained
 - **Error Recovery**: Non-blocking failures for optional integrations (SMTP, external APIs)
 - **Containerization**: Docker for consistent deployment; Docker Compose for multi-service orchestration
 

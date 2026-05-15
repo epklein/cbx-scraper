@@ -33,7 +33,7 @@ By scraping the complete rating history table from CBX profiles and storing reco
 
 1. **Enhanced table parsing:** Extract all data rows from the rating history table (not just the first row)
 2. **Month deduplication:** When a month appears multiple times in the table, keep only the most recent (topmost) entry
-3. **Date mapping:** Map month/year strings (e.g., "Nov/2025") to the last day of that month (e.g., "2025-11-30")
+3. **Date mapping:** Map month/year strings (e.g., "Nov/2025") to the first day of that month (e.g., "2025-11-01"), since CBX creates rating records at the beginning of the month
 4. **Monthly storage model:** Change CSV storage from one row per day to one row per month per player, replacing existing month entries
 5. **History comparison:** Compare entire scraped history against stored history to identify new months
 6. **Selective notifications:** Only trigger email/API notifications when new months are added to the history
@@ -48,7 +48,7 @@ By scraping the complete rating history table from CBX profiles and storing reco
 
 ## Technical Considerations
 
-- **Backward compatibility:** CSV "Date" column now contains monthly dates (last day of month) instead of daily dates; no schema migration needed
+- **Backward compatibility:** CSV "Date" column now contains monthly dates (first day of month, e.g., 2025-11-01) instead of daily dates; no schema migration needed
 - **Deduplication strategy:** For repeated months, keep the topmost entry (most recent)
 - **Storage efficiency:** Monthly granularity reduces redundant daily entries for unchanged months
 - **Partial history:** System handles incomplete historical data and fills in missing months on subsequent runs

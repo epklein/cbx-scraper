@@ -205,8 +205,8 @@ All output goes through Python's `logging` module (to stderr). The default log l
 2026-05-05 10:00:03 - DEBUG - Latest CBX Ratings:
 Date         CBX ID       Player Name                              Standard  Rapid  Blitz
 -----------------------------------------------------------------------------------------
-2025-06-30   27507        Luis Paulo Supi                          2556      2317   1991
-2025-11-30   41921        Neuris Delgado Ramirez                   2572      2423   2660
+2025-06-01   27507        Luis Paulo Supi                          2556      2317   1991
+2025-11-01   41921        Neuris Delgado Ramirez                   2572      2423   2660
 
 2026-05-05 10:00:03 - DEBUG - Email sent to Luis Paulo Supi (supi@example.com)
 2026-05-05 10:00:03 - DEBUG - API updates posted for Luis Paulo Supi (27507) - 1 months
@@ -223,13 +223,13 @@ LOG_LEVEL=DEBUG python cbx_scraper.py
 - **Location**: Current working directory
 - **Format**: Standard CSV with proper escaping for special characters
 - **Columns**: Date, CBX ID, Player Name, Standard, Rapid, Blitz
-- **Behavior**: Runs on the same day replace previous data for that day; runs on different dates preserve history
+- **Behavior**: Runs in the same month replace previous data for that month; runs in different months preserve history
 
 **Example CSV Content**:
 ```csv
 Date,CBX ID,Player Name,Standard,Rapid,Blitz
-2025-06-30,27507,Luis Paulo Supi,2556,2317,1991
-2025-11-31,41921,Neuris Delgado Ramirez,2572,2423,2660
+2025-06-01,27507,Luis Paulo Supi,2556,2317,1991
+2025-11-01,41921,Neuris Delgado Ramirez,2572,2423,2660
 ```
 
 **Batch Processing Features**:
@@ -240,6 +240,7 @@ Date,CBX ID,Player Name,Standard,Rapid,Blitz
 - Preserves complete history of all rating retrievals across multiple runs
 - Displays results in the console
 - Provides summary of successful and failed processing
+- Date column uses the first day of the month (e.g., 2025-11-01), matching when CBX creates new rating records
 
 ## Finding a CBX ID
 
@@ -263,7 +264,7 @@ When using batch processing mode, the script appends data to a persistent CSV fi
 - **Special Characters**: Automatically escaped (commas in names are quoted)
 - **Missing Ratings**: Empty cell for missing/unrated ratings
 - **History**: New entries are appended on subsequent runs; all previous entries are preserved
-- **Date Format**: ISO 8601 (YYYY-MM-DD) for each entry
+- **Date Format**: ISO 8601 (YYYY-MM-DD), set to the first day of the month (e.g., `2025-11-01` for November 2025)
 
 The CSV file can be opened in:
 - Microsoft Excel
@@ -281,9 +282,9 @@ The script manages the output CSV file intelligently to balance history preserva
 - Creates the output file (default: `cbx_ratings.csv`) with headers and initial data
 
 **Subsequent Runs**:
-- If you run the script **on a different date**: New entries are appended, preserving all previous entries
-- If you run the script **on the same day**: Previous data for that day is replaced with new data
-- This ensures you always have the latest information for each date, while maintaining complete history across different dates
+- If you run the script **in a different month**: New entries are appended, preserving all previous entries
+- If you run the script **in the same month**: Previous data for that month is replaced with new data
+- This ensures you always have the latest information for each month, while maintaining complete history across different months
 
 ## Rating Change Notifications (Email Alerts)
 
